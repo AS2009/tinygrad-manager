@@ -1,3 +1,4 @@
+# setup.py
 from setuptools import setup
 
 APP = ['TinyGradManager/main.py']
@@ -15,7 +16,6 @@ OPTIONS = {
         'NSHumanReadableCopyright': 'Copyright © 2025',
         'NSHighResolutionCapable': True,
     },
-    # 不要在此放置 install_requires
 }
 
 setup(
@@ -24,12 +24,5 @@ setup(
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
-    install_requires=[
-        'tinygrad',
-        'pyobjc',
-        'fastapi',
-        'uvicorn',
-        'pydantic',
-        'Pillow',
-    ],
+    # 注意：此处绝不能包含 install_requires 参数！
 )
