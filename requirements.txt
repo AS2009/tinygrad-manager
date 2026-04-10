@@ -1,4 +1,4 @@
-tinygrad-nightly
+tinygrad
 pyobjc
 pyobjc-framework-Cocoa
 pyobjc-framework-Quartz
