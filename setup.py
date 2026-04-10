@@ -23,12 +23,5 @@ setup(
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
-    install_requires=[
-        'tinygrad',
-        'pyobjc',
-        'fastapi',
-        'uvicorn',
-        'pydantic',
-        'Pillow',
-    ],
+    # 移除 install_requires 参数
 )
