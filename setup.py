@@ -14,7 +14,16 @@ OPTIONS = {
         'CFBundleShortVersionString': '1.0.0',
         'NSHumanReadableCopyright': 'Copyright © 2025',
         'NSHighResolutionCapable': True,
-    }
+    },
+    # 将依赖项放在 options 中，而不是 setup() 的 install_requires
+    'install_requires': [
+        'tinygrad',
+        'pyobjc',
+        'fastapi',
+        'uvicorn',
+        'pydantic',
+        'Pillow',
+    ],
 }
 
 setup(
@@ -23,5 +32,5 @@ setup(
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
-    # 移除 install_requires 参数
+    # 此处不再包含 install_requires
 )
