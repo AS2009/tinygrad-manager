@@ -24,7 +24,18 @@ jobs:
           pip install -r requirements.txt
           pip install py2app
 
-      - name: Build .app with py2app
+  - name: Debug - Show file structure
+  run: |
+    echo "===== Current directory ====="
+    pwd
+    echo "===== Root files ====="
+    ls -la
+    echo "===== Check for TinyGradManager (case sensitive) ====="
+    ls -la TinyGradManager || echo "TinyGradManager not found"
+    echo "===== All directories (ignore case) ====="
+    find . -maxdepth 1 -type d -iname "tinygrad*"
+
+ - name: Build .app with py2app
         run: |
           python setup.py py2app
 
