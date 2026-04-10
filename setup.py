@@ -15,15 +15,7 @@ OPTIONS = {
         'NSHumanReadableCopyright': 'Copyright © 2025',
         'NSHighResolutionCapable': True,
     },
-    # 将依赖项放在 options 中，而不是 setup() 的 install_requires
-    'install_requires': [
-        'tinygrad',
-        'pyobjc',
-        'fastapi',
-        'uvicorn',
-        'pydantic',
-        'Pillow',
-    ],
+    # 不要在此放置 install_requires
 }
 
 setup(
@@ -32,5 +24,12 @@ setup(
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
-    # 此处不再包含 install_requires
+    install_requires=[
+        'tinygrad',
+        'pyobjc',
+        'fastapi',
+        'uvicorn',
+        'pydantic',
+        'Pillow',
+    ],
 )
