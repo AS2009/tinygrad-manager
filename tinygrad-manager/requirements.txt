@@ -1,8 +1,0 @@
-tinygrad-nightly
-pyobjc
-pyobjc-framework-Cocoa
-pyobjc-framework-Quartz
-fastapi
-uvicorn
-pydantic
-Pillow
