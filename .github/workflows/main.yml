@@ -22,23 +22,76 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install py2app delocate
+          pip install py2app
 
       - name: Build .app with py2app
         run: |
           python setup.py py2app
 
-      - name: Fix dependencies with delocate and sign
+      - name: Fix Pillow dynamic libraries and sign
         run: |
+          set -e
           APP="dist/TinyGradManager.app"
+          PIL_SO="$APP/Contents/Resources/lib/python3.11/PIL/_imaging.cpython-311-darwin.so"
+          DYLIB_DEST="$APP/Contents/Resources/lib/python3.11/PIL/.dylibs"
 
-          # 使用 delocate 自动修复所有 .so 的依赖
+          brew install libtiff libjpeg libpng webp little-cms2 openjpeg || true
+
+          mkdir -p "$DYLIB_DEST"
+
+          copy_and_sign() {
+            local src_pattern=$1
+            local src_file=$(ls $src_pattern 2>/dev/null | head -1)
+            if [ -n "$src_file" ]; then
+              cp "$src_file" "$DYLIB_DEST/"
+              local dest_file="$DYLIB_DEST/$(basename "$src_file")"
+              codesign --force --sign - "$dest_file"
+              echo "Copied and signed $(basename "$src_file")"
+              basename "$src_file"
+            else
+              echo "Warning: No file matching $src_pattern"
+              echo ""
+            fi
+          }
+
+          if [ -d "/opt/homebrew" ]; then
+            BREW_PREFIX="/opt/homebrew"
+          else
+            BREW_PREFIX="/usr/local"
+          fi
+
+          TIFF_LIB=$(copy_and_sign "$BREW_PREFIX/opt/libtiff/lib/libtiff*.dylib")
+          JPEG_LIB=$(copy_and_sign "$BREW_PREFIX/opt/jpeg/lib/libjpeg*.dylib")
+          PNG_LIB=$(copy_and_sign "$BREW_PREFIX/opt/libpng/lib/libpng*.dylib")
+          WEBP_LIB=$(copy_and_sign "$BREW_PREFIX/opt/webp/lib/libwebp*.dylib")
+          LCMS_LIB=$(copy_and_sign "$BREW_PREFIX/opt/little-cms2/lib/liblcms2*.dylib")
+          OPENJP2_LIB=$(copy_and_sign "$BREW_PREFIX/opt/openjpeg/lib/libopenjp2*.dylib")
+
+          if [ -n "$TIFF_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/$TIFF_LIB" "$PIL_SO"
+          fi
+          if [ -n "$JPEG_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/$JPEG_LIB" "$PIL_SO"
+          fi
+          if [ -n "$PNG_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/$PNG_LIB" "$PIL_SO"
+          fi
+          if [ -n "$WEBP_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/$WEBP_LIB" "$PIL_SO"
+          fi
+          if [ -n "$LCMS_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/$LCMS_LIB" "$PIL_SO"
+          fi
+          if [ -n "$OPENJP2_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/$OPENJP2_LIB" "$PIL_SO"
+          fi
+
+          codesign --force --sign - "$PIL_SO"
+
+          pip install delocate
           find "$APP/Contents/Resources" -name "*.so" -exec delocate-wheel -w "$APP/Contents/Resources/lib" -v {} \; 2>/dev/null || true
 
-          # 清除扩展属性
           xattr -cr "$APP"
-
-          # 对整个 .app 进行深度 ad-hoc 签名
           codesign --force --deep --sign - "$APP"
           codesign -dv "$APP"
 
