@@ -11,13 +11,14 @@ if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
 sys.path.insert(0, os.path.dirname(__file__))
 
 import objc
-from Foundation import NSObject, NSRunLoop, NSLog, NSOpenPanel, NSModalResponseOK
+from Foundation import NSObject, NSRunLoop, NSLog
 from AppKit import (
     NSApplication, NSWindow, NSView,
     NSButton, NSTextField, NSPopUpButton, NSScrollView, NSTextView,
     NSMakeRect, NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
-    NSBackingStoreBuffered
+    NSBackingStoreBuffered,
+    NSOpenPanel, NSModalResponseOK  # ← 这两个必须从 AppKit 导入！
 )
 from threading import Thread
 
