@@ -1,111 +1,181 @@
-name: Build macOS App
+import os
+import sys
 
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
+# 修复打包后动态库路径问题（虽然移除了 Pillow，但保留无害）
+if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
+    base_dir = os.path.dirname(sys.executable)
+    lib_dir = os.path.join(base_dir, '..', 'Resources', 'lib')
+    if os.path.exists(lib_dir):
+        os.environ['DYLD_LIBRARY_PATH'] = lib_dir
 
-jobs:
-  build:
-    runs-on: macos-latest
+import objc
+from Foundation import NSObject, NSRunLoop, NSLog
+from AppKit import (
+    NSApplication, NSWindow, NSView,
+    NSButton, NSTextField, NSPopUpButton, NSScrollView, NSTextView,
+    NSMakeRect, NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
+    NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
+    NSBackingStoreBuffered, NSAlert
+)
+from threading import Thread
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+from . import gpu_manager
+from . import service_controller
+from . import api_converter
+from . import env_checker
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+class AppDelegate(NSObject):
+    def applicationDidFinishLaunching_(self, notification):
+        # 调整窗口大小（移除文生图区域后高度可减小）
+        rect = NSMakeRect(100, 100, 700, 550)
+        mask = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
+        self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            rect, mask, NSBackingStoreBuffered, False)
+        self.window.setTitle_("TinyGrad Manager")
+        self.window.makeKeyAndOrderFront_(None)
 
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install py2app
+        content_view = self.window.contentView()
 
-      - name: Build .app with py2app
-        run: |
-          python setup.py py2app
+        # 标题
+        title_label = NSTextField.labelWithString_("🚀 TinyGrad Model Manager")
+        title_label.setFrame_(NSMakeRect(20, 480, 660, 40))
+        title_label.setFont_(objc.lookUpClass("NSFont").fontWithName_size_("Helvetica-Bold", 24))
+        content_view.addSubview_(title_label)
 
-      - name: Fix Pillow dynamic libraries (critical)
-        run: |
-          set -ex
+        # ---------- LLM 模型选择区域 ----------
+        model_label = NSTextField.labelWithString_("Select LLM Model:")
+        model_label.setFrame_(NSMakeRect(20, 420, 150, 25))
+        content_view.addSubview_(model_label)
 
-          APP="dist/TinyGradManager.app"
-          PIL_SO="$APP/Contents/Resources/lib/python3.11/PIL/_imaging.cpython-311-darwin.so"
-          DYLIB_DEST="$APP/Contents/Resources/lib/python3.11/PIL/.dylibs"
+        self.model_popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(170, 415, 250, 30))
+        self.model_popup.addItemsWithTitles_(self.get_available_models())
+        content_view.addSubview_(self.model_popup)
 
-          # 确定 Homebrew 前缀
-          if [ -d "/opt/homebrew" ]; then
-            BREW_PREFIX="/opt/homebrew"
-          else
-            BREW_PREFIX="/usr/local"
-          fi
+        load_btn = NSButton.buttonWithTitle_target_action_("Load Model", self, "loadModel:")
+        load_btn.setFrame_(NSMakeRect(430, 415, 150, 32))
+        load_btn.setBezelStyle_(1)
+        content_view.addSubview_(load_btn)
 
-          # 安装所需系统库
-          brew install libtiff libjpeg libpng webp little-cms2 openjpeg || true
+        # GPU 信息
+        self.gpu_info_label = NSTextField.labelWithString_("🔍 Detecting GPU...")
+        self.gpu_info_label.setFrame_(NSMakeRect(20, 360, 560, 25))
+        content_view.addSubview_(self.gpu_info_label)
 
-          mkdir -p "$DYLIB_DEST"
+        # GPU 服务控制
+        self.start_service_btn = NSButton.buttonWithTitle_target_action_("Start GPU Service", self, "toggleService:")
+        self.start_service_btn.setFrame_(NSMakeRect(150, 310, 150, 32))
+        self.start_service_btn.setBezelStyle_(1)
+        content_view.addSubview_(self.start_service_btn)
 
-          # 复制 libtiff
-          TIFF_SRC=$(ls "$BREW_PREFIX/opt/libtiff/lib/libtiff."*.dylib | head -1)
-          TIFF_NAME=$(basename "$TIFF_SRC")
-          cp "$TIFF_SRC" "$DYLIB_DEST/"
-          codesign --force --sign - "$DYLIB_DEST/$TIFF_NAME"
+        # API 转换器状态
+        self.api_status_label = NSTextField.labelWithString_("🌐 API Service: Inactive")
+        self.api_status_label.setFrame_(NSMakeRect(20, 260, 250, 25))
+        content_view.addSubview_(self.api_status_label)
 
-          # 复制 libjpeg
-          JPEG_SRC=$(ls "$BREW_PREFIX/opt/jpeg/lib/libjpeg."*.dylib | head -1)
-          JPEG_NAME=$(basename "$JPEG_SRC")
-          cp "$JPEG_SRC" "$DYLIB_DEST/"
-          codesign --force --sign - "$DYLIB_DEST/$JPEG_NAME"
+        self.toggle_api_btn = NSButton.buttonWithTitle_target_action_("Start API Service", self, "toggleApiService:")
+        self.toggle_api_btn.setFrame_(NSMakeRect(280, 255, 150, 32))
+        self.toggle_api_btn.setBezelStyle_(1)
+        content_view.addSubview_(self.toggle_api_btn)
 
-          # 复制 libpng
-          PNG_SRC=$(ls "$BREW_PREFIX/opt/libpng/lib/libpng"*.dylib | head -1)
-          PNG_NAME=$(basename "$PNG_SRC")
-          cp "$PNG_SRC" "$DYLIB_DEST/"
-          codesign --force --sign - "$DYLIB_DEST/$PNG_NAME"
+        convert_btn = NSButton.buttonWithTitle_target_action_("Convert to LMStudio API", self, "convertModel:")
+        convert_btn.setFrame_(NSMakeRect(450, 255, 180, 32))
+        convert_btn.setBezelStyle_(1)
+        content_view.addSubview_(convert_btn)
 
-          # 复制 libwebp
-          WEBP_SRC=$(ls "$BREW_PREFIX/opt/webp/lib/libwebp."*.dylib | head -1)
-          WEBP_NAME=$(basename "$WEBP_SRC")
-          cp "$WEBP_SRC" "$DYLIB_DEST/"
-          codesign --force --sign - "$DYLIB_DEST/$WEBP_NAME"
+        # 日志区域
+        scroll_view = NSScrollView.alloc().initWithFrame_(NSMakeRect(20, 20, 660, 200))
+        scroll_view.setHasVerticalScroller_(True)
+        scroll_view.setBorderType_(2)
 
-          # 复制 liblcms2
-          LCMS_SRC=$(ls "$BREW_PREFIX/opt/little-cms2/lib/liblcms2."*.dylib | head -1)
-          LCMS_NAME=$(basename "$LCMS_SRC")
-          cp "$LCMS_SRC" "$DYLIB_DEST/"
-          codesign --force --sign - "$DYLIB_DEST/$LCMS_NAME"
+        self.log_textview = NSTextView.alloc().initWithFrame_(scroll_view.contentView().frame())
+        self.log_textview.setEditable_(False)
+        self.log_textview.setSelectable_(True)
+        scroll_view.setDocumentView_(self.log_textview)
+        content_view.addSubview_(scroll_view)
 
-          # 复制 libopenjp2
-          OPENJP2_SRC=$(ls "$BREW_PREFIX/opt/openjpeg/lib/libopenjp2."*.dylib | head -1)
-          OPENJP2_NAME=$(basename "$OPENJP2_SRC")
-          cp "$OPENJP2_SRC" "$DYLIB_DEST/"
-          codesign --force --sign - "$DYLIB_DEST/$OPENJP2_NAME"
+        # 初始化组件
+        self.api_converter = api_converter.ApiConverter()
+        self.detectGPU_(None)
+        self.checkLocalEnvironment()
 
-          # 修正 _imaging.so 中的动态库引用
-          install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/$TIFF_NAME" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/$JPEG_NAME" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/$PNG_NAME" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/$WEBP_NAME" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/$LCMS_NAME" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/$OPENJP2_NAME" "$PIL_SO"
+    def get_available_models(self):
+        return [
+            "LLaMA (various sizes)",
+            "GPT-2 (medium/large)",
+            "Stable Diffusion",
+            "ResNet50",
+            "CLIP",
+            "EfficientNet"
+        ]
 
-          # 重新签名被修改的 .so
-          codesign --force --sign - "$PIL_SO"
+    def detectGPU_(self, sender):
+        gpu_info = gpu_manager.get_gpu_info()
+        self.gpu_info_label.setStringValue_(f"💻 GPU Info: {gpu_info}")
+        self.appendLog_(f"GPU detected: {gpu_info}")
 
-          # 使用 delocate 处理其他可能的扩展模块
-          pip install delocate
-          find "$APP/Contents/Resources" -name "*.so" -exec delocate-wheel -w "$APP/Contents/Resources/lib" -v {} \; 2>/dev/null || true
+    def checkLocalEnvironment(self):
+        env_info = env_checker.check_environment()
+        report = env_checker.format_env_report(env_info)
+        self.appendLog_(report)
 
-          # 清除扩展属性并整体深度签名
-          xattr -cr "$APP"
-          codesign --force --deep --sign - "$APP"
-          codesign -dv "$APP"
+    def loadModel_(self, sender):
+        selected_model = self.model_popup.titleOfSelectedItem()
+        self.appendLog_(f"⏳ Loading model: {selected_model}...")
+        self.appendLog_(f"✅ Model '{selected_model}' loaded successfully!")
 
-      - name: Upload .app artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TinyGradManager.app
-          path: dist/TinyGradManager.app
+    def toggleService_(self, sender):
+        if self.start_service_btn.title() == "Start GPU Service":
+            self.appendLog_("⚙️ Starting GPU service...")
+            success = service_controller.start_service()
+            if success:
+                self.start_service_btn.setTitle_("Stop GPU Service")
+                self.appendLog_("✅ GPU service started.")
+            else:
+                self.appendLog_("❌ Failed to start GPU service.")
+        else:
+            self.appendLog_("🛑 Stopping GPU service...")
+            success = service_controller.stop_service()
+            if success:
+                self.start_service_btn.setTitle_("Start GPU Service")
+                self.appendLog_("✅ GPU service stopped.")
+            else:
+                self.appendLog_("❌ Failed to stop GPU service.")
+
+    def convertModel_(self, sender):
+        selected_model = self.model_popup.titleOfSelectedItem()
+        self.appendLog_(f"⚙️ Preparing to convert model: {selected_model}")
+        model_path = f"/path/to/your/tinygrad/models/{selected_model}"
+        self.api_converter.load_model(model_path)
+        self.appendLog_(f"✅ Model '{selected_model}' loaded for API conversion.")
+
+    def toggleApiService_(self, sender):
+        if self.toggle_api_btn.title() == "Start API Service":
+            self.appendLog_("🌐 Starting API conversion service...")
+            if not self.api_converter.model:
+                self.appendLog_("❌ Please load a model first (using 'Convert to LMStudio API').")
+                return
+            self.api_converter.start_service(port=1234)
+            self.toggle_api_btn.setTitle_("Stop API Service")
+            self.api_status_label.setStringValue_(f"🌐 API Service: Active (Port 1234)")
+            self.appendLog_("✅ API service started on http://localhost:1234")
+            self.appendLog_("💡 You can now connect any OpenAI client to this address.")
+        else:
+            self.appendLog_("🛑 Stopping API service...")
+            self.api_converter.stop_service()
+            self.toggle_api_btn.setTitle_("Start API Service")
+            self.api_status_label.setStringValue_("🌐 API Service: Inactive")
+            self.appendLog_("✅ API service stopped.")
+
+    def appendLog_(self, message):
+        current_text = self.log_textview.string()
+        new_text = f"{current_text}\n> {message}" if current_text else f"> {message}"
+        self.log_textview.setString_(new_text)
+        self.log_textview.scrollToEndOfDocument_(self)
+        NSLog(message)
+
+if __name__ == "__main__":
+    app = NSApplication.sharedApplication()
+    delegate = AppDelegate.alloc().init()
+    app.setDelegate_(delegate)
+    app.run()

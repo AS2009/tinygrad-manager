@@ -6,7 +6,7 @@ OPTIONS = {
     'argv_emulation': False,
     'packages': [
         'tinygrad',
-        'fastapi', 'uvicorn', 'pydantic', 'PIL',
+        'fastapi', 'uvicorn', 'pydantic',
         'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
         'urllib3', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
     ],
@@ -14,9 +14,8 @@ OPTIONS = {
         'AppKit', 'Foundation', 'objc',
         'pydantic_core', 'pydantic_core._pydantic_core',
         'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer',
-        'PIL._imaging', 'PIL.Image', 'PIL.ImageFile',
     ],
-    'excludes': ['tkinter', 'matplotlib', 'pandas', 'test'],
+    'excludes': ['tkinter', 'matplotlib', 'pandas', 'test', 'PIL'],
     'plist': {
         'CFBundleName': 'TinyGradManager',
         'CFBundleDisplayName': 'TinyGrad Manager',

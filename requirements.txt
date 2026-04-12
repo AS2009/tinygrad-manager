@@ -5,7 +5,6 @@ pyobjc-framework-Quartz
 fastapi
 uvicorn
 pydantic
-Pillow
 numpy
 requests
 sniffio
