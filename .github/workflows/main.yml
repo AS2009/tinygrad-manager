@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
@@ -28,33 +28,13 @@ jobs:
         run: |
           python setup.py py2app
 
-      - name: Fix Pillow dynamic libraries and sign
+      - name: Fix Pillow dynamic libraries (critical)
         run: |
-          set -e
+          set -ex
+
           APP="dist/TinyGradManager.app"
           PIL_SO="$APP/Contents/Resources/lib/python3.11/PIL/_imaging.cpython-311-darwin.so"
           DYLIB_DEST="$APP/Contents/Resources/lib/python3.11/PIL/.dylibs"
-
-          # 安装所需系统库
-          brew install libtiff libjpeg libpng webp little-cms2 openjpeg || true
-
-          mkdir -p "$DYLIB_DEST"
-
-          # 辅助函数：复制并签名动态库，返回实际文件名
-          copy_and_sign() {
-            local src_pattern=$1
-            local src_file=$(ls $src_pattern 2>/dev/null | head -1)
-            if [ -n "$src_file" ]; then
-              cp "$src_file" "$DYLIB_DEST/"
-              local dest_file="$DYLIB_DEST/$(basename "$src_file")"
-              codesign --force --sign - "$dest_file"
-              echo "Copied and signed $(basename "$src_file")" >&2
-              basename "$src_file"
-            else
-              echo "Warning: No file matching $src_pattern" >&2
-              echo ""
-            fi
-          }
 
           # 确定 Homebrew 前缀
           if [ -d "/opt/homebrew" ]; then
@@ -63,42 +43,63 @@ jobs:
             BREW_PREFIX="/usr/local"
           fi
 
-          # 复制并获取实际文件名
-          TIFF_LIB=$(copy_and_sign "$BREW_PREFIX/opt/libtiff/lib/libtiff*.dylib")
-          JPEG_LIB=$(copy_and_sign "$BREW_PREFIX/opt/jpeg/lib/libjpeg*.dylib")
-          PNG_LIB=$(copy_and_sign "$BREW_PREFIX/opt/libpng/lib/libpng*.dylib")
-          WEBP_LIB=$(copy_and_sign "$BREW_PREFIX/opt/webp/lib/libwebp*.dylib")
-          LCMS_LIB=$(copy_and_sign "$BREW_PREFIX/opt/little-cms2/lib/liblcms2*.dylib")
-          OPENJP2_LIB=$(copy_and_sign "$BREW_PREFIX/opt/openjpeg/lib/libopenjp2*.dylib")
+          # 安装所需系统库
+          brew install libtiff libjpeg libpng webp little-cms2 openjpeg || true
 
-          # 修正 _imaging.so 中的库引用路径
-          if [ -n "$TIFF_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/$TIFF_LIB" "$PIL_SO"
-          fi
-          if [ -n "$JPEG_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/$JPEG_LIB" "$PIL_SO"
-          fi
-          if [ -n "$PNG_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/$PNG_LIB" "$PIL_SO"
-          fi
-          if [ -n "$WEBP_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/$WEBP_LIB" "$PIL_SO"
-          fi
-          if [ -n "$LCMS_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/$LCMS_LIB" "$PIL_SO"
-          fi
-          if [ -n "$OPENJP2_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/$OPENJP2_LIB" "$PIL_SO"
-          fi
+          mkdir -p "$DYLIB_DEST"
 
-          # 重新签名 _imaging.so
+          # 复制 libtiff
+          TIFF_SRC=$(ls "$BREW_PREFIX/opt/libtiff/lib/libtiff."*.dylib | head -1)
+          TIFF_NAME=$(basename "$TIFF_SRC")
+          cp "$TIFF_SRC" "$DYLIB_DEST/"
+          codesign --force --sign - "$DYLIB_DEST/$TIFF_NAME"
+
+          # 复制 libjpeg
+          JPEG_SRC=$(ls "$BREW_PREFIX/opt/jpeg/lib/libjpeg."*.dylib | head -1)
+          JPEG_NAME=$(basename "$JPEG_SRC")
+          cp "$JPEG_SRC" "$DYLIB_DEST/"
+          codesign --force --sign - "$DYLIB_DEST/$JPEG_NAME"
+
+          # 复制 libpng
+          PNG_SRC=$(ls "$BREW_PREFIX/opt/libpng/lib/libpng"*.dylib | head -1)
+          PNG_NAME=$(basename "$PNG_SRC")
+          cp "$PNG_SRC" "$DYLIB_DEST/"
+          codesign --force --sign - "$DYLIB_DEST/$PNG_NAME"
+
+          # 复制 libwebp
+          WEBP_SRC=$(ls "$BREW_PREFIX/opt/webp/lib/libwebp."*.dylib | head -1)
+          WEBP_NAME=$(basename "$WEBP_SRC")
+          cp "$WEBP_SRC" "$DYLIB_DEST/"
+          codesign --force --sign - "$DYLIB_DEST/$WEBP_NAME"
+
+          # 复制 liblcms2
+          LCMS_SRC=$(ls "$BREW_PREFIX/opt/little-cms2/lib/liblcms2."*.dylib | head -1)
+          LCMS_NAME=$(basename "$LCMS_SRC")
+          cp "$LCMS_SRC" "$DYLIB_DEST/"
+          codesign --force --sign - "$DYLIB_DEST/$LCMS_NAME"
+
+          # 复制 libopenjp2
+          OPENJP2_SRC=$(ls "$BREW_PREFIX/opt/openjpeg/lib/libopenjp2."*.dylib | head -1)
+          OPENJP2_NAME=$(basename "$OPENJP2_SRC")
+          cp "$OPENJP2_SRC" "$DYLIB_DEST/"
+          codesign --force --sign - "$DYLIB_DEST/$OPENJP2_NAME"
+
+          # 修正 _imaging.so 中的动态库引用
+          install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/$TIFF_NAME" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/$JPEG_NAME" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/$PNG_NAME" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/$WEBP_NAME" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/$LCMS_NAME" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/$OPENJP2_NAME" "$PIL_SO"
+
+          # 重新签名被修改的 .so
           codesign --force --sign - "$PIL_SO"
 
-          # 安装 delocate 并修复其他可能的 .so
+          # 使用 delocate 处理其他可能的扩展模块
           pip install delocate
           find "$APP/Contents/Resources" -name "*.so" -exec delocate-wheel -w "$APP/Contents/Resources/lib" -v {} \; 2>/dev/null || true
 
-          # 清除扩展属性并深度签名
+          # 清除扩展属性并整体深度签名
           xattr -cr "$APP"
           codesign --force --deep --sign - "$APP"
           codesign -dv "$APP"
