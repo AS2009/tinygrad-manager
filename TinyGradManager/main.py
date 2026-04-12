@@ -1,29 +1,7 @@
 import os
 import sys
 
-# 强制设置动态库搜索路径，适配 .app 内部结构
-if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
-    base_dir = os.path.dirname(sys.executable)
-    resources_dir = os.path.join(base_dir, '..', 'Resources')
-    lib_dir = os.path.join(resources_dir, 'lib')
-    
-    # 设置通用库路径
-    os.environ['DYLD_LIBRARY_PATH'] = lib_dir
-    
-    # 特别为 Pillow 添加 .dylibs 子目录
-    pil_dylib = os.path.join(lib_dir, 'python3.11', 'PIL', '.dylibs')
-    if os.path.exists(pil_dylib):
-        os.environ['DYLD_LIBRARY_PATH'] += f":{pil_dylib}"
-    
-    # 将 Resources 目录加入 Python 路径
-    if resources_dir not in sys.path:
-        sys.path.insert(0, resources_dir)
-        sys.path.insert(0, lib_dir)
-
-import os
-import sys
-
-# 修复打包后动态库路径问题
+# 设置动态库搜索路径，适配 .app 内部结构
 if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
     base_dir = os.path.dirname(sys.executable)
     lib_dir = os.path.join(base_dir, '..', 'Resources', 'lib')

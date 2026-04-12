@@ -22,85 +22,20 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install py2app
+          pip install py2app delocate
 
       - name: Build .app with py2app
         run: |
           python setup.py py2app
 
-      
-      - name: Fix dynamic libraries and ad-hoc sign all binaries
+      - name: Fix dependencies with delocate and sign
         run: |
           APP="dist/TinyGradManager.app"
-          PIL_SO="$APP/Contents/Resources/lib/python3.11/PIL/_imaging.cpython-311-darwin.so"
-          DYLIB_DEST="$APP/Contents/Resources/lib/python3.11/PIL/.dylibs"
 
-          # 检测 Homebrew 前缀
-          if [ -d "/opt/homebrew" ]; then
-            BREW_PREFIX="/opt/homebrew"
-          else
-            BREW_PREFIX="/usr/local"
-          fi
+          # 使用 delocate 自动修复所有 .so 的依赖
+          find "$APP/Contents/Resources" -name "*.so" -exec delocate-wheel -w "$APP/Contents/Resources/lib" -v {} \; 2>/dev/null || true
 
-          # 安装缺失的系统库
-          brew install libtiff jpeg libpng webp little-cms2 openjpeg || true
-
-          mkdir -p "$DYLIB_DEST"
-
-          # 辅助函数：复制并签名库文件
-          copy_and_sign_lib() {
-            local libname=$1
-            local src_dir=$2
-            local src_file=$(ls "$src_dir"/${libname}*.dylib 2>/dev/null | head -1)
-            if [ -n "$src_file" ]; then
-              cp "$src_file" "$DYLIB_DEST/"
-              local dest_file="$DYLIB_DEST/$(basename "$src_file")"
-              codesign --force --sign - "$dest_file"
-              echo "Copied and signed $(basename "$src_file")"
-            else
-              echo "Warning: ${libname} not found in $src_dir"
-            fi
-          }
-
-          copy_and_sign_lib "libtiff" "$BREW_PREFIX/opt/libtiff/lib/"
-          copy_and_sign_lib "libjpeg" "$BREW_PREFIX/opt/jpeg/lib/"
-          copy_and_sign_lib "libpng" "$BREW_PREFIX/opt/libpng/lib/"
-          copy_and_sign_lib "libwebp" "$BREW_PREFIX/opt/webp/lib/"
-          copy_and_sign_lib "liblcms2" "$BREW_PREFIX/opt/little-cms2/lib/"
-          copy_and_sign_lib "libopenjp2" "$BREW_PREFIX/opt/openjpeg/lib/"
-
-          # 获取实际复制的文件名
-          TIFF_LIB=$(basename $(ls "$DYLIB_DEST"/libtiff*.dylib 2>/dev/null | head -1))
-          JPEG_LIB=$(basename $(ls "$DYLIB_DEST"/libjpeg*.dylib 2>/dev/null | head -1))
-          PNG_LIB=$(basename $(ls "$DYLIB_DEST"/libpng*.dylib 2>/dev/null | head -1))
-          WEBP_LIB=$(basename $(ls "$DYLIB_DEST"/libwebp*.dylib 2>/dev/null | head -1))
-          LCMS_LIB=$(basename $(ls "$DYLIB_DEST"/liblcms2*.dylib 2>/dev/null | head -1))
-          OPENJP2_LIB=$(basename $(ls "$DYLIB_DEST"/libopenjp2*.dylib 2>/dev/null | head -1))
-
-          # 修正 _imaging.so 中的库引用路径，并立即重新签名
-          if [ -n "$TIFF_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/$TIFF_LIB" "$PIL_SO"
-          fi
-          if [ -n "$JPEG_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/$JPEG_LIB" "$PIL_SO"
-          fi
-          if [ -n "$PNG_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/$PNG_LIB" "$PIL_SO"
-          fi
-          if [ -n "$WEBP_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/$WEBP_LIB" "$PIL_SO"
-          fi
-          if [ -n "$LCMS_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/$LCMS_LIB" "$PIL_SO"
-          fi
-          if [ -n "$OPENJP2_LIB" ]; then
-            install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/$OPENJP2_LIB" "$PIL_SO"
-          fi
-
-          # 重新签名被修改的 _imaging.so
-          codesign --force --sign - "$PIL_SO"
-
-          # 清除所有扩展属性，避免 Gatekeeper 干扰
+          # 清除扩展属性
           xattr -cr "$APP"
 
           # 对整个 .app 进行深度 ad-hoc 签名
