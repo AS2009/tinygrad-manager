@@ -28,7 +28,6 @@ OPTIONS = {
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '10.13',
     },
-    # 以下两行已删除：'include_library_dylibs' 和 'semi_standalone'
     'site_packages': True,
 }
 

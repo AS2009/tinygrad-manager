@@ -8,3 +8,8 @@ pydantic
 Pillow
 numpy
 requests
+sniffio
+anyio
+starlette
+click
+h11
