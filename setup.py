@@ -5,17 +5,19 @@ DATA_FILES = []
 OPTIONS = {
     'argv_emulation': False,
     'packages': [
-        'tinygrad', 'fastapi', 'uvicorn', 'pydantic', 'PIL',
+        'tinygrad', 'tinygrad.nn', 'tinygrad.runtime', 'tinygrad.helpers',
+        'fastapi', 'uvicorn', 'pydantic', 'PIL',
         'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
+        'urllib3', 'yaml', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
     ],
     'includes': [
         'AppKit', 'Foundation', 'objc',
         'pydantic_core', 'pydantic_core._pydantic_core',
         'pydantic.deprecated.decorator',
-        'PIL._imaging', 'PIL.Image', 'PIL.ImageFile', 'PIL.ImageDraw',
-        'PIL.ImageFont', 'PIL.ImageFilter', 'PIL.ImageOps',
+        'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer',
+        'PIL._imaging', 'PIL.Image', 'PIL.ImageFile',
     ],
-    'excludes': ['tkinter', 'matplotlib', 'pandas'],
+    'excludes': ['tkinter', 'matplotlib', 'pandas', 'test'],
     'plist': {
         'CFBundleName': 'TinyGradManager',
         'CFBundleDisplayName': 'TinyGrad Manager',
@@ -26,10 +28,10 @@ OPTIONS = {
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '10.13',
     },
-    # 强制包含 Pillow 的 C 扩展及其依赖的动态库
-    'frameworks': [],
-    'resources': [],
-    'iconfile': None,
+    # 解决 Pillow 动态库问题
+    'include_library_dylibs': True,
+    'semi_standalone': False,
+    'site_packages': True,
 }
 
 setup(

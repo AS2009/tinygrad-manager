@@ -1,3 +1,20 @@
+# 修复打包后动态库找不到的问题
+import os
+import sys
+
+# 添加 .app 内部的库路径到环境变量
+if getattr(sys, 'frozen', False):
+    # 运行在打包后的 .app 中
+    base_dir = os.path.dirname(sys.executable)
+    lib_dir = os.path.join(base_dir, '..', 'Resources', 'lib')
+    if os.path.exists(lib_dir):
+        os.environ['DYLD_LIBRARY_PATH'] = lib_dir
+        # 尝试将 PIL 所需的 .dylib 目录也加入
+        pil_dylib = os.path.join(lib_dir, 'python3.11', 'PIL', '.dylibs')
+        if os.path.exists(pil_dylib):
+            os.environ['DYLD_LIBRARY_PATH'] += f":{pil_dylib}"
+
+# ... 后面保持原有代码不变 ...
 import objc
 from Foundation import NSObject, NSRunLoop, NSLog
 from AppKit import (
