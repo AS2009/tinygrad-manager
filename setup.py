@@ -8,7 +8,7 @@ OPTIONS = {
         'tinygrad', 'tinygrad.nn', 'tinygrad.runtime', 'tinygrad.helpers',
         'fastapi', 'uvicorn', 'pydantic', 'PIL',
         'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
-        'urllib3', 'yaml', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
+        'urllib3', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
     ],
     'includes': [
         'AppKit', 'Foundation', 'objc',
@@ -28,9 +28,7 @@ OPTIONS = {
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '10.13',
     },
-    # 解决 Pillow 动态库问题
-    'include_library_dylibs': True,
-    'semi_standalone': False,
+    # 以下两行已删除：'include_library_dylibs' 和 'semi_standalone'
     'site_packages': True,
 }
 
