@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,12 +17,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Cache pip
-        uses: actions/cache@v3
-        with:
-          path: ~/Library/Caches/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
       - name: Install dependencies
         run: |
@@ -32,6 +27,40 @@ jobs:
       - name: Build .app with py2app
         run: |
           python setup.py py2app
+
+      - name: Fix Pillow dynamic library paths
+        run: |
+          APP="dist/TinyGradManager.app"
+          PIL_SO="$APP/Contents/Resources/lib/python3.11/PIL/_imaging.cpython-311-darwin.so"
+          DYLIB_DEST="$APP/Contents/Resources/lib/python3.11/PIL/.dylibs"
+
+          # 检测 Homebrew 前缀 (Apple Silicon 为 /opt/homebrew，Intel 为 /usr/local)
+          if [ -d "/opt/homebrew" ]; then
+            BREW_PREFIX="/opt/homebrew"
+          else
+            BREW_PREFIX="/usr/local"
+          fi
+
+          # 安装缺失的系统库
+          brew install libtiff libjpeg libpng webp little-cms2 openjpeg
+
+          mkdir -p "$DYLIB_DEST"
+
+          # 复制动态库
+          cp "$BREW_PREFIX/opt/libtiff/lib/libtiff.6.dylib" "$DYLIB_DEST/"
+          cp "$BREW_PREFIX/opt/jpeg/lib/libjpeg.8.dylib" "$DYLIB_DEST/"
+          cp "$BREW_PREFIX/opt/libpng/lib/libpng16.16.dylib" "$DYLIB_DEST/"
+          cp "$BREW_PREFIX/opt/webp/lib/libwebp.7.dylib" "$DYLIB_DEST/"
+          cp "$BREW_PREFIX/opt/little-cms2/lib/liblcms2.2.dylib" "$DYLIB_DEST/"
+          cp "$BREW_PREFIX/opt/openjpeg/lib/libopenjp2.7.dylib" "$DYLIB_DEST/"
+
+          # 修正引用路径
+          install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/libtiff.6.dylib" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/libjpeg.8.dylib" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/libpng16.16.dylib" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/libwebp.7.dylib" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/liblcms2.2.dylib" "$PIL_SO"
+          install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/libopenjp2.7.dylib" "$PIL_SO"
 
       - name: Upload .app artifact
         uses: actions/upload-artifact@v4

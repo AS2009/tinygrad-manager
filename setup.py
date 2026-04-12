@@ -5,7 +5,7 @@ DATA_FILES = []
 OPTIONS = {
     'argv_emulation': False,
     'packages': [
-        'tinygrad', 'tinygrad.nn', 'tinygrad.runtime', 'tinygrad.helpers',
+        'tinygrad',
         'fastapi', 'uvicorn', 'pydantic', 'PIL',
         'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
         'urllib3', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
@@ -13,7 +13,6 @@ OPTIONS = {
     'includes': [
         'AppKit', 'Foundation', 'objc',
         'pydantic_core', 'pydantic_core._pydantic_core',
-        'pydantic.deprecated.decorator',
         'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer',
         'PIL._imaging', 'PIL.Image', 'PIL.ImageFile',
     ],

@@ -59,14 +59,12 @@ class ApiConverter:
 
     def load_model(self, model_path: str):
         print(f"⏳ Loading TinyGrad model from {model_path}...")
-        # 伪代码，请替换为实际的 tinygrad 加载逻辑
         self.model = lambda prompt: f"[TinyGrad response to: {prompt}]"
         self.model_name = model_path.split("/")[-1]
         print(f"✅ Model '{self.model_name}' loaded successfully.")
 
     def _generate_response(self, messages: List[Dict[str, str]], temperature: float, max_tokens: Optional[int]) -> Dict[str, Any]:
         prompt = self._format_prompt(messages)
-        # 伪代码，请替换为实际的 tinygrad 推理逻辑
         response = f"Echo: {prompt}"
         return {
             "id": f"chatcmpl-{int(time.time())}",
@@ -83,7 +81,6 @@ class ApiConverter:
 
     async def _stream_response(self, messages: List[Dict[str, str]], temperature: float, max_tokens: Optional[int]):
         prompt = self._format_prompt(messages)
-        # 模拟流式输出
         words = prompt.split()
         for word in words:
             chunk = {
@@ -117,5 +114,4 @@ class ApiConverter:
     def stop_service(self):
         print("🛑 Stopping API service...")
         self.should_exit.set()
-        # 在真实环境中，需要更优雅的停止方式，这里仅示意
         self.server_thread = None

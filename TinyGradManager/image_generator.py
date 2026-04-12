@@ -96,8 +96,10 @@ def generate_image(
             if width and height:
                 gen_kwargs["W"] = width
                 gen_kwargs["H"] = height
-            # 调用模型生成
-            image = _loaded_model.generate(**gen_kwargs)
+            if hasattr(_loaded_model, 'generate'):
+                image = _loaded_model.generate(**gen_kwargs)
+            else:
+                image = _loaded_model(prompt)
             if progress_callback:
                 progress_callback(steps, steps, "Saving...")
             temp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)

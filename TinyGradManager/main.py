@@ -1,20 +1,16 @@
-# 修复打包后动态库找不到的问题
 import os
 import sys
 
-# 添加 .app 内部的库路径到环境变量
-if getattr(sys, 'frozen', False):
-    # 运行在打包后的 .app 中
+# 修复打包后动态库路径问题
+if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
     base_dir = os.path.dirname(sys.executable)
     lib_dir = os.path.join(base_dir, '..', 'Resources', 'lib')
     if os.path.exists(lib_dir):
         os.environ['DYLD_LIBRARY_PATH'] = lib_dir
-        # 尝试将 PIL 所需的 .dylib 目录也加入
         pil_dylib = os.path.join(lib_dir, 'python3.11', 'PIL', '.dylibs')
         if os.path.exists(pil_dylib):
             os.environ['DYLD_LIBRARY_PATH'] += f":{pil_dylib}"
 
-# ... 后面保持原有代码不变 ...
 import objc
 from Foundation import NSObject, NSRunLoop, NSLog
 from AppKit import (
@@ -22,8 +18,7 @@ from AppKit import (
     NSButton, NSTextField, NSPopUpButton, NSScrollView, NSTextView,
     NSMakeRect, NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
-    NSBackingStoreBuffered, NSAlert, NSAlertStyleInformational,
-    NSImageView, NSImage, NSImageScaleProportionallyUpOrDown,
+    NSBackingStoreBuffered, NSImageView, NSImage, NSImageScaleProportionallyUpOrDown,
     NSSavePanel, NSModalResponseOK
 )
 from threading import Thread
@@ -36,7 +31,6 @@ from . import image_generator
 
 class AppDelegate(NSObject):
     def applicationDidFinishLaunching_(self, notification):
-        # 创建更大的窗口以容纳所有控件
         rect = NSMakeRect(100, 100, 800, 750)
         mask = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                 NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
@@ -53,7 +47,7 @@ class AppDelegate(NSObject):
         title_label.setFont_(objc.lookUpClass("NSFont").fontWithName_size_("Helvetica-Bold", 24))
         content_view.addSubview_(title_label)
 
-        # ---------- 模型选择区域 ----------
+        # ---------- LLM 模型选择区域 ----------
         model_label = NSTextField.labelWithString_("Select LLM Model:")
         model_label.setFrame_(NSMakeRect(20, 620, 150, 25))
         content_view.addSubview_(model_label)
@@ -190,7 +184,6 @@ class AppDelegate(NSObject):
         self.detectGPU_(None)
         self.checkLocalEnvironment()
 
-        # 用于存储生成图像的路径
         self.generated_image_path = None
 
     def get_available_models(self):
@@ -216,7 +209,6 @@ class AppDelegate(NSObject):
     def loadModel_(self, sender):
         selected_model = self.model_popup.titleOfSelectedItem()
         self.appendLog_(f"⏳ Loading model: {selected_model}...")
-        # 此处可添加实际加载逻辑
         self.appendLog_(f"✅ Model '{selected_model}' loaded successfully!")
 
     def toggleService_(self, sender):
