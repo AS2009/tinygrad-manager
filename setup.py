@@ -6,12 +6,14 @@ OPTIONS = {
     'argv_emulation': False,
     'packages': [
         'tinygrad', 'fastapi', 'uvicorn', 'pydantic', 'PIL',
-        'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests'
+        'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
     ],
     'includes': [
         'AppKit', 'Foundation', 'objc',
         'pydantic_core', 'pydantic_core._pydantic_core',
         'pydantic.deprecated.decorator',
+        'PIL._imaging', 'PIL.Image', 'PIL.ImageFile', 'PIL.ImageDraw',
+        'PIL.ImageFont', 'PIL.ImageFilter', 'PIL.ImageOps',
     ],
     'excludes': ['tkinter', 'matplotlib', 'pandas'],
     'plist': {
@@ -24,6 +26,10 @@ OPTIONS = {
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '10.13',
     },
+    # 强制包含 Pillow 的 C 扩展及其依赖的动态库
+    'frameworks': [],
+    'resources': [],
+    'iconfile': None,
 }
 
 setup(
