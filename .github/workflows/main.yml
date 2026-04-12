@@ -31,14 +31,30 @@ jobs:
       - name: Ad-hoc code sign the .app
         run: |
           APP="dist/TinyGradManager.app"
-          # 清除可能存在的扩展属性
           xattr -cr "$APP"
-          # 深度签名
           codesign --force --deep --sign - "$APP"
           codesign -dv "$APP"
 
-      - name: Upload .app artifact
+      - name: Create DMG
+        run: |
+          APP="dist/TinyGradManager.app"
+          DMG_NAME="TinyGradManager"
+          DMG_FILE="dist/${DMG_NAME}.dmg"
+
+          # 创建临时目录用于存放 .app
+          TMP_DIR=$(mktemp -d)
+          cp -R "$APP" "$TMP_DIR/"
+
+          # 创建 DMG
+          hdiutil create -volname "$DMG_NAME" -srcfolder "$TMP_DIR" -ov -format UDZO "$DMG_FILE"
+
+          # 清理临时目录
+          rm -rf "$TMP_DIR"
+
+          echo "DMG created at $DMG_FILE"
+
+      - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TinyGradManager.app
-          path: dist/TinyGradManager.app
+          name: TinyGradManager.dmg
+          path: dist/TinyGradManager.dmg
