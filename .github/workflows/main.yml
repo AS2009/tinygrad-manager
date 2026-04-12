@@ -91,6 +91,14 @@ jobs:
           echo "=== After modification ==="
           otool -L "$PIL_SO" | head -20
 
+      - name: Ad-hoc code sign the .app
+        run: |
+          APP_PATH="dist/TinyGradManager.app"
+          # 对 .app 进行 ad-hoc 签名，允许本地运行
+          codesign --force --deep --sign - "$APP_PATH"
+          # 验证签名
+          codesign -dv "$APP_PATH"
+
       - name: Upload .app artifact
         uses: actions/upload-artifact@v4
         with:
