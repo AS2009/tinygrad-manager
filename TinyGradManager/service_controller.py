@@ -46,7 +46,15 @@ def stop_service():
     return True
 
 def serve():
-    print("TinyGrad service is running...")
+    """后台服务：初始化 tinygrad 运行时，保持运行"""
+    print("TinyGrad GPU service starting...")
+    try:
+        from tinygrad import Device
+        default_device = Device.DEFAULT
+        print(f"Initialized default device: {default_device}")
+    except Exception as e:
+        print(f"Error initializing tinygrad: {e}")
+
     import time
     while True:
         time.sleep(10)

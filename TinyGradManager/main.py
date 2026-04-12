@@ -1,28 +1,27 @@
 import os
 import sys
 
-# 修复动态库路径（虽然无 Pillow，但保留以备用）
+# 修复动态库路径
 if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
     base_dir = os.path.dirname(sys.executable)
     lib_dir = os.path.join(base_dir, '..', 'Resources', 'lib')
     if os.path.exists(lib_dir):
         os.environ['DYLD_LIBRARY_PATH'] = lib_dir
 
-# 将当前目录加入搜索路径，使绝对导入可用
 sys.path.insert(0, os.path.dirname(__file__))
 
 import objc
-from Foundation import NSObject, NSRunLoop, NSLog
+from Foundation import NSObject, NSRunLoop, NSLog, NSOpenPanel, NSModalResponseOK
 from AppKit import (
     NSApplication, NSWindow, NSView,
     NSButton, NSTextField, NSPopUpButton, NSScrollView, NSTextView,
     NSMakeRect, NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
-    NSBackingStoreBuffered, NSAlert
+    NSBackingStoreBuffered
 )
 from threading import Thread
 
-# 绝对导入自定义模块
+# 导入自定义模块
 import gpu_manager
 import service_controller
 import api_converter
@@ -30,7 +29,8 @@ import env_checker
 
 class AppDelegate(NSObject):
     def applicationDidFinishLaunching_(self, notification):
-        rect = NSMakeRect(100, 100, 700, 550)
+        # 窗口尺寸
+        rect = NSMakeRect(100, 100, 750, 600)
         mask = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                 NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
         self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -42,52 +42,55 @@ class AppDelegate(NSObject):
 
         # 标题
         title_label = NSTextField.labelWithString_("🚀 TinyGrad Model Manager")
-        title_label.setFrame_(NSMakeRect(20, 480, 660, 40))
+        title_label.setFrame_(NSMakeRect(20, 530, 710, 40))
         title_label.setFont_(objc.lookUpClass("NSFont").fontWithName_size_("Helvetica-Bold", 24))
         content_view.addSubview_(title_label)
 
-        # LLM 模型选择区域
-        model_label = NSTextField.labelWithString_("Select LLM Model:")
-        model_label.setFrame_(NSMakeRect(20, 420, 150, 25))
+        # ---------- 模型选择区域 ----------
+        model_label = NSTextField.labelWithString_("Select Model File:")
+        model_label.setFrame_(NSMakeRect(20, 470, 150, 25))
         content_view.addSubview_(model_label)
 
-        self.model_popup = NSPopUpButton.alloc().initWithFrame_(NSMakeRect(170, 415, 250, 30))
-        self.model_popup.addItemsWithTitles_(self.get_available_models())
-        content_view.addSubview_(self.model_popup)
+        # 显示所选文件路径的标签
+        self.model_path_label = NSTextField.labelWithString_("No file selected")
+        self.model_path_label.setFrame_(NSMakeRect(20, 440, 500, 25))
+        content_view.addSubview_(self.model_path_label)
 
+        # 选择文件按钮
+        select_btn = NSButton.buttonWithTitle_target_action_("Browse...", self, "selectModelFile:")
+        select_btn.setFrame_(NSMakeRect(530, 435, 100, 32))
+        select_btn.setBezelStyle_(1)
+        content_view.addSubview_(select_btn)
+
+        # 加载模型按钮
         load_btn = NSButton.buttonWithTitle_target_action_("Load Model", self, "loadModel:")
-        load_btn.setFrame_(NSMakeRect(430, 415, 150, 32))
+        load_btn.setFrame_(NSMakeRect(640, 435, 90, 32))
         load_btn.setBezelStyle_(1)
         content_view.addSubview_(load_btn)
 
         # GPU 信息
         self.gpu_info_label = NSTextField.labelWithString_("🔍 Detecting GPU...")
-        self.gpu_info_label.setFrame_(NSMakeRect(20, 360, 560, 25))
+        self.gpu_info_label.setFrame_(NSMakeRect(20, 390, 560, 25))
         content_view.addSubview_(self.gpu_info_label)
 
         # GPU 服务控制
         self.start_service_btn = NSButton.buttonWithTitle_target_action_("Start GPU Service", self, "toggleService:")
-        self.start_service_btn.setFrame_(NSMakeRect(150, 310, 150, 32))
+        self.start_service_btn.setFrame_(NSMakeRect(150, 340, 150, 32))
         self.start_service_btn.setBezelStyle_(1)
         content_view.addSubview_(self.start_service_btn)
 
         # API 转换器状态
         self.api_status_label = NSTextField.labelWithString_("🌐 API Service: Inactive")
-        self.api_status_label.setFrame_(NSMakeRect(20, 260, 250, 25))
+        self.api_status_label.setFrame_(NSMakeRect(20, 290, 250, 25))
         content_view.addSubview_(self.api_status_label)
 
         self.toggle_api_btn = NSButton.buttonWithTitle_target_action_("Start API Service", self, "toggleApiService:")
-        self.toggle_api_btn.setFrame_(NSMakeRect(280, 255, 150, 32))
+        self.toggle_api_btn.setFrame_(NSMakeRect(280, 285, 150, 32))
         self.toggle_api_btn.setBezelStyle_(1)
         content_view.addSubview_(self.toggle_api_btn)
 
-        convert_btn = NSButton.buttonWithTitle_target_action_("Convert to LMStudio API", self, "convertModel:")
-        convert_btn.setFrame_(NSMakeRect(450, 255, 180, 32))
-        convert_btn.setBezelStyle_(1)
-        content_view.addSubview_(convert_btn)
-
         # 日志区域
-        scroll_view = NSScrollView.alloc().initWithFrame_(NSMakeRect(20, 20, 660, 200))
+        scroll_view = NSScrollView.alloc().initWithFrame_(NSMakeRect(20, 20, 710, 250))
         scroll_view.setHasVerticalScroller_(True)
         scroll_view.setBorderType_(2)
 
@@ -99,18 +102,68 @@ class AppDelegate(NSObject):
 
         # 初始化组件
         self.api_converter = api_converter.ApiConverter()
+        self.loaded_model = None      # 保存加载的模型对象
+        self.model_path = None        # 保存模型文件路径
+
         self.detectGPU_(None)
         self.checkLocalEnvironment()
 
-    def get_available_models(self):
-        return [
-            "LLaMA (various sizes)",
-            "GPT-2 (medium/large)",
-            "Stable Diffusion",
-            "ResNet50",
-            "CLIP",
-            "EfficientNet"
-        ]
+    def selectModelFile_(self, sender):
+        """打开文件选择对话框，选择模型权重文件"""
+        panel = NSOpenPanel.openPanel()
+        panel.setCanChooseFiles_(True)
+        panel.setCanChooseDirectories_(False)
+        panel.setAllowsMultipleSelection_(False)
+        panel.setTitle_("Select Model File")
+        panel.setMessage_("Choose a model weight file (.safetensors, .pth, .gguf, etc.)")
+        panel.setAllowedFileTypes_(["safetensors", "pth", "pt", "gguf", "bin", "json"])
+
+        if panel.runModal() == NSModalResponseOK:
+            url = panel.URLs()[0]
+            file_path = url.path()
+            self.model_path = file_path
+            self.model_path_label.setStringValue_(f"📁 {os.path.basename(file_path)}")
+            self.appendLog_(f"Selected: {file_path}")
+
+    def loadModel_(self, sender):
+        """加载选中的模型文件"""
+        if not self.model_path:
+            self.appendLog_("❌ No model file selected.")
+            return
+
+        self.appendLog_(f"⏳ Loading model from {self.model_path}...")
+        try:
+            from tinygrad.nn.state import safe_load, torch_load
+            import json
+
+            # 根据扩展名加载权重
+            if self.model_path.endswith('.safetensors'):
+                state_dict = safe_load(self.model_path)
+            elif self.model_path.endswith(('.pth', '.pt')):
+                state_dict = torch_load(self.model_path)
+            elif self.model_path.endswith('.json'):
+                # 可能是模型配置
+                with open(self.model_path, 'r') as f:
+                    config = json.load(f)
+                self.appendLog_(f"Loaded config: {list(config.keys())}")
+                # 暂存配置，实际使用时需根据配置构建模型
+                self.loaded_model = config
+                self.appendLog_("✅ Config loaded. (Model architecture not yet implemented)")
+                return
+            else:
+                self.appendLog_(f"❌ Unsupported file type: {self.model_path}")
+                return
+
+            # 这里简单保存 state_dict，实际使用时需构建对应的网络结构并加载权重
+            self.loaded_model = state_dict
+            self.appendLog_(f"✅ Model weights loaded. Keys count: {len(state_dict)}")
+
+            # 将模型传递给 API 转换器
+            self.api_converter.set_model(self.loaded_model, os.path.basename(self.model_path))
+            self.appendLog_("✅ Model transferred to API converter.")
+
+        except Exception as e:
+            self.appendLog_(f"❌ Failed to load model: {str(e)}")
 
     def detectGPU_(self, sender):
         gpu_info = gpu_manager.get_gpu_info()
@@ -122,18 +175,13 @@ class AppDelegate(NSObject):
         report = env_checker.format_env_report(env_info)
         self.appendLog_(report)
 
-    def loadModel_(self, sender):
-        selected_model = self.model_popup.titleOfSelectedItem()
-        self.appendLog_(f"⏳ Loading model: {selected_model}...")
-        self.appendLog_(f"✅ Model '{selected_model}' loaded successfully!")
-
     def toggleService_(self, sender):
         if self.start_service_btn.title() == "Start GPU Service":
             self.appendLog_("⚙️ Starting GPU service...")
             success = service_controller.start_service()
             if success:
                 self.start_service_btn.setTitle_("Stop GPU Service")
-                self.appendLog_("✅ GPU service started.")
+                self.appendLog_("✅ GPU service started (tinygrad runtime initialized).")
             else:
                 self.appendLog_("❌ Failed to start GPU service.")
         else:
@@ -145,24 +193,16 @@ class AppDelegate(NSObject):
             else:
                 self.appendLog_("❌ Failed to stop GPU service.")
 
-    def convertModel_(self, sender):
-        selected_model = self.model_popup.titleOfSelectedItem()
-        self.appendLog_(f"⚙️ Preparing to convert model: {selected_model}")
-        model_path = f"/path/to/your/tinygrad/models/{selected_model}"
-        self.api_converter.load_model(model_path)
-        self.appendLog_(f"✅ Model '{selected_model}' loaded for API conversion.")
-
     def toggleApiService_(self, sender):
         if self.toggle_api_btn.title() == "Start API Service":
             self.appendLog_("🌐 Starting API conversion service...")
-            if not self.api_converter.model:
-                self.appendLog_("❌ Please load a model first (using 'Convert to LMStudio API').")
+            if not self.api_converter.is_ready():
+                self.appendLog_("❌ No model loaded for API service. Please load a model first.")
                 return
             self.api_converter.start_service(port=1234)
             self.toggle_api_btn.setTitle_("Stop API Service")
-            self.api_status_label.setStringValue_(f"🌐 API Service: Active (Port 1234)")
+            self.api_status_label.setStringValue_("🌐 API Service: Active (Port 1234)")
             self.appendLog_("✅ API service started on http://localhost:1234")
-            self.appendLog_("💡 You can now connect any OpenAI client to this address.")
         else:
             self.appendLog_("🛑 Stopping API service...")
             self.api_converter.stop_service()

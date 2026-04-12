@@ -28,12 +28,21 @@ class ApiConverter:
 
     def __init__(self):
         self.app = FastAPI(title="TinyGrad to LMStudio API Converter")
-        self.model = None
+        self.model = None           # 存储模型对象（可以是state_dict或完整模型）
         self.model_name = None
         self.server_thread = None
         self.server_port = 1234
         self.should_exit = threading.Event()
         self.setup_routes()
+
+    def set_model(self, model, model_name: str):
+        """设置用于推理的模型"""
+        self.model = model
+        self.model_name = model_name
+        print(f"Model '{model_name}' set for API.")
+
+    def is_ready(self):
+        return self.model is not None
 
     def setup_routes(self):
         @self.app.get("/v1/models")
@@ -57,15 +66,16 @@ class ApiConverter:
             else:
                 return self._generate_response(request.messages, request.temperature, request.max_tokens)
 
-    def load_model(self, model_path: str):
-        print(f"⏳ Loading TinyGrad model from {model_path}...")
-        self.model = lambda prompt: f"[TinyGrad response to: {prompt}]"
-        self.model_name = model_path.split("/")[-1]
-        print(f"✅ Model '{self.model_name}' loaded successfully.")
-
     def _generate_response(self, messages: List[Dict[str, str]], temperature: float, max_tokens: Optional[int]) -> Dict[str, Any]:
         prompt = self._format_prompt(messages)
-        response = f"Echo: {prompt}"
+        # 此处应调用实际模型的推理逻辑
+        # 由于不同模型推理接口差异，这里提供一个模拟响应，提醒用户自行实现
+        response = f"[TinyGrad] Received: {prompt[:100]}..."
+        # 实际使用时替换为：
+        # tokens = tokenizer.encode(prompt)
+        # output = model.generate(tokens, temperature, max_tokens)
+        # response = tokenizer.decode(output)
+
         return {
             "id": f"chatcmpl-{int(time.time())}",
             "object": "chat.completion",
@@ -76,13 +86,13 @@ class ApiConverter:
                 "message": {"role": "assistant", "content": response},
                 "finish_reason": "stop"
             }],
-            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+            "usage": {"prompt_tokens": len(prompt.split()), "completion_tokens": len(response.split()), "total_tokens": len(prompt.split())+len(response.split())}
         }
 
     async def _stream_response(self, messages: List[Dict[str, str]], temperature: float, max_tokens: Optional[int]):
         prompt = self._format_prompt(messages)
         words = prompt.split()
-        for word in words:
+        for i, word in enumerate(words[:max_tokens or 20]):
             chunk = {
                 "id": f"chatcmpl-{int(time.time())}",
                 "object": "chat.completion.chunk",
