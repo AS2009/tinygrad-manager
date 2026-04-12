@@ -35,10 +35,12 @@ jobs:
           PIL_SO="$APP/Contents/Resources/lib/python3.11/PIL/_imaging.cpython-311-darwin.so"
           DYLIB_DEST="$APP/Contents/Resources/lib/python3.11/PIL/.dylibs"
 
+          # 安装所需系统库
           brew install libtiff libjpeg libpng webp little-cms2 openjpeg || true
 
           mkdir -p "$DYLIB_DEST"
 
+          # 辅助函数：复制并签名动态库，返回实际文件名
           copy_and_sign() {
             local src_pattern=$1
             local src_file=$(ls $src_pattern 2>/dev/null | head -1)
@@ -46,20 +48,22 @@ jobs:
               cp "$src_file" "$DYLIB_DEST/"
               local dest_file="$DYLIB_DEST/$(basename "$src_file")"
               codesign --force --sign - "$dest_file"
-              echo "Copied and signed $(basename "$src_file")"
+              echo "Copied and signed $(basename "$src_file")" >&2
               basename "$src_file"
             else
-              echo "Warning: No file matching $src_pattern"
+              echo "Warning: No file matching $src_pattern" >&2
               echo ""
             fi
           }
 
+          # 确定 Homebrew 前缀
           if [ -d "/opt/homebrew" ]; then
             BREW_PREFIX="/opt/homebrew"
           else
             BREW_PREFIX="/usr/local"
           fi
 
+          # 复制并获取实际文件名
           TIFF_LIB=$(copy_and_sign "$BREW_PREFIX/opt/libtiff/lib/libtiff*.dylib")
           JPEG_LIB=$(copy_and_sign "$BREW_PREFIX/opt/jpeg/lib/libjpeg*.dylib")
           PNG_LIB=$(copy_and_sign "$BREW_PREFIX/opt/libpng/lib/libpng*.dylib")
@@ -67,6 +71,7 @@ jobs:
           LCMS_LIB=$(copy_and_sign "$BREW_PREFIX/opt/little-cms2/lib/liblcms2*.dylib")
           OPENJP2_LIB=$(copy_and_sign "$BREW_PREFIX/opt/openjpeg/lib/libopenjp2*.dylib")
 
+          # 修正 _imaging.so 中的库引用路径
           if [ -n "$TIFF_LIB" ]; then
             install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/$TIFF_LIB" "$PIL_SO"
           fi
@@ -86,11 +91,14 @@ jobs:
             install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/$OPENJP2_LIB" "$PIL_SO"
           fi
 
+          # 重新签名 _imaging.so
           codesign --force --sign - "$PIL_SO"
 
+          # 安装 delocate 并修复其他可能的 .so
           pip install delocate
           find "$APP/Contents/Resources" -name "*.so" -exec delocate-wheel -w "$APP/Contents/Resources/lib" -v {} \; 2>/dev/null || true
 
+          # 清除扩展属性并深度签名
           xattr -cr "$APP"
           codesign --force --deep --sign - "$APP"
           codesign -dv "$APP"
