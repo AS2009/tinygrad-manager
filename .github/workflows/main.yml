@@ -34,33 +34,69 @@ jobs:
           PIL_SO="$APP/Contents/Resources/lib/python3.11/PIL/_imaging.cpython-311-darwin.so"
           DYLIB_DEST="$APP/Contents/Resources/lib/python3.11/PIL/.dylibs"
 
-          # 检测 Homebrew 前缀 (Apple Silicon 为 /opt/homebrew，Intel 为 /usr/local)
+          # 检测 Homebrew 前缀
           if [ -d "/opt/homebrew" ]; then
             BREW_PREFIX="/opt/homebrew"
           else
             BREW_PREFIX="/usr/local"
           fi
 
-          # 安装缺失的系统库
-          brew install libtiff libjpeg libpng webp little-cms2 openjpeg
+          # 安装缺失的系统库（如果尚未安装）
+          brew install libtiff jpeg libpng webp little-cms2 openjpeg || true
 
           mkdir -p "$DYLIB_DEST"
 
-          # 复制动态库
-          cp "$BREW_PREFIX/opt/libtiff/lib/libtiff.6.dylib" "$DYLIB_DEST/"
-          cp "$BREW_PREFIX/opt/jpeg/lib/libjpeg.8.dylib" "$DYLIB_DEST/"
-          cp "$BREW_PREFIX/opt/libpng/lib/libpng16.16.dylib" "$DYLIB_DEST/"
-          cp "$BREW_PREFIX/opt/webp/lib/libwebp.7.dylib" "$DYLIB_DEST/"
-          cp "$BREW_PREFIX/opt/little-cms2/lib/liblcms2.2.dylib" "$DYLIB_DEST/"
-          cp "$BREW_PREFIX/opt/openjpeg/lib/libopenjp2.7.dylib" "$DYLIB_DEST/"
+          # 辅助函数：复制库文件（自动匹配版本）
+          copy_lib() {
+            local libname=$1
+            local src_dir=$2
+            # 查找以 libname 开头的 .dylib 文件（不限定版本号）
+            local src_file=$(ls "$src_dir"/${libname}*.dylib 2>/dev/null | head -1)
+            if [ -n "$src_file" ]; then
+              cp "$src_file" "$DYLIB_DEST/"
+              echo "Copied $(basename "$src_file")"
+            else
+              echo "Warning: ${libname} not found in $src_dir"
+            fi
+          }
 
-          # 修正引用路径
-          install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/libtiff.6.dylib" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/libjpeg.8.dylib" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/libpng16.16.dylib" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/libwebp.7.dylib" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/liblcms2.2.dylib" "$PIL_SO"
-          install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/libopenjp2.7.dylib" "$PIL_SO"
+          # 复制各个库
+          copy_lib "libtiff" "$BREW_PREFIX/opt/libtiff/lib/"
+          copy_lib "libjpeg" "$BREW_PREFIX/opt/jpeg/lib/"
+          copy_lib "libpng" "$BREW_PREFIX/opt/libpng/lib/"
+          copy_lib "libwebp" "$BREW_PREFIX/opt/webp/lib/"
+          copy_lib "liblcms2" "$BREW_PREFIX/opt/little-cms2/lib/"
+          copy_lib "libopenjp2" "$BREW_PREFIX/opt/openjpeg/lib/"
+
+          # 获取实际复制的文件名
+          TIFF_LIB=$(basename $(ls "$DYLIB_DEST"/libtiff*.dylib 2>/dev/null | head -1))
+          JPEG_LIB=$(basename $(ls "$DYLIB_DEST"/libjpeg*.dylib 2>/dev/null | head -1))
+          PNG_LIB=$(basename $(ls "$DYLIB_DEST"/libpng*.dylib 2>/dev/null | head -1))
+          WEBP_LIB=$(basename $(ls "$DYLIB_DEST"/libwebp*.dylib 2>/dev/null | head -1))
+          LCMS_LIB=$(basename $(ls "$DYLIB_DEST"/liblcms2*.dylib 2>/dev/null | head -1))
+          OPENJP2_LIB=$(basename $(ls "$DYLIB_DEST"/libopenjp2*.dylib 2>/dev/null | head -1))
+
+          # 修正 _imaging.so 中的库引用路径
+          if [ -n "$TIFF_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libtiff.6.dylib" "@loader_path/.dylibs/$TIFF_LIB" "$PIL_SO"
+          fi
+          if [ -n "$JPEG_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libjpeg.8.dylib" "@loader_path/.dylibs/$JPEG_LIB" "$PIL_SO"
+          fi
+          if [ -n "$PNG_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libpng16.16.dylib" "@loader_path/.dylibs/$PNG_LIB" "$PIL_SO"
+          fi
+          if [ -n "$WEBP_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libwebp.7.dylib" "@loader_path/.dylibs/$WEBP_LIB" "$PIL_SO"
+          fi
+          if [ -n "$LCMS_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/liblcms2.2.dylib" "@loader_path/.dylibs/$LCMS_LIB" "$PIL_SO"
+          fi
+          if [ -n "$OPENJP2_LIB" ]; then
+            install_name_tool -change "@loader_path/.dylibs/libopenjp2.7.dylib" "@loader_path/.dylibs/$OPENJP2_LIB" "$PIL_SO"
+          fi
+
+          echo "Library paths fixed successfully."
 
       - name: Upload .app artifact
         uses: actions/upload-artifact@v4
