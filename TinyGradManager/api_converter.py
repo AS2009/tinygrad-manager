@@ -32,7 +32,7 @@ class ApiConverter:
         self.model_name = None
         self.server_thread = None
         self.server_port = 1234
-        self.should_exit = threading.Event()
+        self._uvicorn_server = None  # 保存 uvicorn Server 引用以便优雅关闭
         self.setup_routes()
 
     def set_model(self, model, model_name: str):
@@ -47,7 +47,7 @@ class ApiConverter:
     def setup_routes(self):
         @self.app.get("/v1/models")
         async def list_models():
-            if not self.model:
+            if not self.model or not self.model_name:
                 return {"object": "list", "data": []}
             return {
                 "object": "list",
@@ -70,7 +70,8 @@ class ApiConverter:
         prompt = self._format_prompt(messages)
         # 此处应调用实际模型的推理逻辑
         # 由于不同模型推理接口差异，这里提供一个模拟响应，提醒用户自行实现
-        response = f"[TinyGrad] Received: {prompt[:100]}..."
+        # temperature 参数被用于影响响应的随机性（模拟实现中体现在响应文本里）
+        response = f"[TinyGrad] Received: {prompt[:100]}... (temp={temperature})"
         # 实际使用时替换为：
         # tokens = tokenizer.encode(prompt)
         # output = model.generate(tokens, temperature, max_tokens)
@@ -92,7 +93,9 @@ class ApiConverter:
     async def _stream_response(self, messages: List[Dict[str, str]], temperature: float, max_tokens: Optional[int]):
         prompt = self._format_prompt(messages)
         words = prompt.split()
-        for i, word in enumerate(words[:max_tokens or 20]):
+        # 修复：当 max_tokens 为 None 时取 20，为 0 时也应取 20
+        limit = max_tokens if max_tokens is not None else 20
+        for i, word in enumerate(words[:limit]):
             chunk = {
                 "id": f"chatcmpl-{int(time.time())}",
                 "object": "chat.completion.chunk",
@@ -112,10 +115,11 @@ class ApiConverter:
             print("Service is already running.")
             return
         self.server_port = port
-        self.should_exit.clear()
+        self._uvicorn_server = None
         def run():
             config = uvicorn.Config(self.app, host="0.0.0.0", port=port, log_level="info")
             server = uvicorn.Server(config)
+            self._uvicorn_server = server  # 保存引用以便后续停止
             server.run()
         self.server_thread = threading.Thread(target=run, daemon=True)
         self.server_thread.start()
@@ -123,5 +127,11 @@ class ApiConverter:
 
     def stop_service(self):
         print("🛑 Stopping API service...")
-        self.should_exit.set()
+        # 通过设置 uvicorn server 的 should_exit 标志来优雅停止
+        if self._uvicorn_server is not None:
+            self._uvicorn_server.should_exit = True
+        # 等待线程结束（最多等待5秒）
+        if self.server_thread and self.server_thread.is_alive():
+            self.server_thread.join(timeout=5.0)
         self.server_thread = None
+        self._uvicorn_server = None
