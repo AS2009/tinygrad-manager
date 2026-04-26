@@ -9,6 +9,7 @@ OPTIONS = {
         'fastapi', 'uvicorn', 'pydantic',
         'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
         'urllib3', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
+        'gguf', 'mlx',
     ],
     'includes': [
         'AppKit', 'Foundation', 'objc',

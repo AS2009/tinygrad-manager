@@ -116,8 +116,8 @@ class AppDelegate(NSObject):
         panel.setCanChooseDirectories_(False)
         panel.setAllowsMultipleSelection_(False)
         panel.setTitle_("Select Model File")
-        panel.setMessage_("Choose a model weight file (.safetensors, .pth, .gguf, etc.)")
-        panel.setAllowedFileTypes_(["safetensors", "pth", "pt", "gguf", "bin", "json"])
+        panel.setMessage_("Choose a model weight file (.safetensors, .pth, .gguf, .mlx, etc.)")
+        panel.setAllowedFileTypes_(["safetensors", "pth", "pt", "gguf", "mlx", "bin", "json"])
 
         if panel.runModal() == NSModalResponseOK:
             url = panel.URLs()[0]
@@ -140,8 +140,12 @@ class AppDelegate(NSObject):
             # 根据扩展名加载权重
             if self.model_path.endswith('.safetensors'):
                 state_dict = safe_load(self.model_path)
+                self.loaded_model = state_dict
+                self.appendLog_(f"✅ Model weights loaded. Keys count: {len(state_dict)}")
             elif self.model_path.endswith(('.pth', '.pt')):
                 state_dict = torch_load(self.model_path)
+                self.loaded_model = state_dict
+                self.appendLog_(f"✅ Model weights loaded. Keys count: {len(state_dict)}")
             elif self.model_path.endswith('.json'):
                 # 可能是模型配置
                 with open(self.model_path, 'r') as f:
@@ -151,20 +155,52 @@ class AppDelegate(NSObject):
                 self.loaded_model = config
                 self.appendLog_("✅ Config loaded. (Model architecture not yet implemented)")
                 return
+            elif self.model_path.endswith('.gguf'):
+                # 使用 gguf Python 库加载 GGUF 格式模型
+                try:
+                    import gguf
+                    reader = gguf.GGUFReader(self.model_path)
+                    self.appendLog_(f"✅ GGUF model loaded. Tensors count: {len(reader.tensors)}")
+                    self.appendLog_(f"   Model architecture: {reader.fields.get('general.architecture', None)}")
+                    # 暴露字段信息以便后续推理使用
+                    self.loaded_model = {
+                        "format": "gguf",
+                        "path": self.model_path,
+                        "reader": reader,
+                        "tensor_count": len(reader.tensors),
+                    }
+                except ImportError:
+                    self.appendLog_("⚠️ 'gguf' package not found. Install with: pip install gguf")
+                    return
+            elif self.model_path.endswith('.mlx'):
+                # 使用 mlx 库加载 MLX 格式模型（.safetensors 通常与 MLX 搭配，.mlx 扩展名也是常见约定）
+                try:
+                    import mlx.core as mx
+                    # MLX 模型通常是一个包含 .safetensors 权重文件的目录，
+                    # 或使用 mlx-lm 加载完整的 MLX 模型
+                    weights = mx.load(self.model_path)
+                    self.loaded_model = {
+                        "format": "mlx",
+                        "path": self.model_path,
+                        "weights": weights,
+                        "tensor_count": len(weights),
+                    }
+                    self.appendLog_(f"✅ MLX model loaded. Weights count: {len(weights)}")
+                except ImportError:
+                    self.appendLog_("⚠️ 'mlx' package not found. Install with: pip install mlx")
+                    return
             else:
                 self.appendLog_(f"❌ Unsupported file type: {self.model_path}")
                 return
-
-            # 这里简单保存 state_dict，实际使用时需构建对应的网络结构并加载权重
-            self.loaded_model = state_dict
-            self.appendLog_(f"✅ Model weights loaded. Keys count: {len(state_dict)}")
 
             # 将模型传递给 API 转换器
             self.api_converter.set_model(self.loaded_model, os.path.basename(self.model_path))
             self.appendLog_("✅ Model transferred to API converter.")
 
         except Exception as e:
+            import traceback
             self.appendLog_(f"❌ Failed to load model: {str(e)}")
+            self.appendLog_(f"   {traceback.format_exc()}")
 
     def detectGPU_(self, sender):
         gpu_info = gpu_manager.get_gpu_info()

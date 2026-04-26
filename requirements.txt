@@ -12,3 +12,5 @@ anyio
 starlette
 click
 h11
+gguf
+mlx
