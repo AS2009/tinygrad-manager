@@ -2,12 +2,12 @@ name: Build macOS App
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
       - name: Checkout code
@@ -18,22 +18,146 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Cache Swift build
+        uses: actions/cache@v4
+        with:
+          path: SwiftGUI/.build
+          key: swift-${{ runner.os }}-${{ hashFiles('SwiftGUI/Package.swift', 'SwiftGUI/Sources/**') }}
+
+      - name: Install Python dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install py2app
 
-      - name: Build .app with py2app
+      - name: Build Swift GUI (arm64, release)
+        working-directory: SwiftGUI
         run: |
-          python setup.py py2app
+          swift build --configuration release --arch arm64
+          echo "Swift binary size: $(du -sh .build/release/TinyGradManager | cut -f1)"
 
-      - name: Ad-hoc code sign the .app
+      - name: Assemble .app bundle
         run: |
           APP="dist/TinyGradManager.app"
-          xattr -cr "$APP"
-          codesign --force --deep --sign - "$APP"
-          codesign -dv "$APP"
+          MACOS="$APP/Contents/MacOS"
+          RESOURCES="$APP/Contents/Resources"
+          SWIFT_BIN="SwiftGUI/.build/release/TinyGradManager"
+
+          # Clean and create structure
+          rm -rf "$APP"
+          mkdir -p "$MACOS" "$RESOURCES"
+
+          # Copy Swift binary
+          cp "$SWIFT_BIN" "$MACOS/TinyGradManager"
+
+          # Copy Python backend
+          cp -R TinyGradManager "$RESOURCES/TinyGradManager"
+          # Remove dev artifacts
+          rm -rf "$RESOURCES/TinyGradManager/__pycache__"
+          find "$RESOURCES/TinyGradManager" -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+
+          # Copy Python dependencies (site-packages from current env)
+          SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+          PACKAGES="tinygrad fastapi uvicorn pydantic pydantic_core starlette anyio sniffio click h11 numpy requests certifi charset_normalizer idna urllib3"
+          for pkg in $PACKAGES; do
+            PKG_PATH="$SITE_PACKAGES/$pkg"
+            if [ -d "$PKG_PATH" ]; then
+              cp -R "$PKG_PATH" "$RESOURCES/"
+            elif [ -f "$PKG_PATH.py" ]; then
+              cp "$PKG_PATH.py" "$RESOURCES/"
+            fi
+          done
+
+          # Copy backend_main.py to a predictable location and create entry script
+          cp TinyGradManager/backend_main.py "$RESOURCES/"
+
+          # Create launch script
+          cat > "$MACOS/launch.sh" << 'LAUNCH_EOF'
+          #!/bin/bash
+          # TinyGrad Manager launcher
+          # Starts the Python backend, then the Swift GUI
+
+          BUNDLE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+          RESOURCES="$BUNDLE_DIR/Resources"
+          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+          # Add bundled Python packages to path
+          export PYTHONPATH="$RESOURCES:$PYTHONPATH"
+
+          # Start the Python backend
+          cd "$RESOURCES"
+          python3 backend_main.py --port 1234 &
+          BACKEND_PID=$!
+
+          # Wait for backend to be ready
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:1234/api/status > /dev/null 2>&1; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          # Start the Swift GUI
+          "$SCRIPT_DIR/TinyGradManager" &
+          GUI_PID=$!
+
+          # Cleanup on exit
+          trap "kill $GUI_PID $BACKEND_PID 2>/dev/null; exit 0" EXIT INT TERM
+
+          # Wait for GUI to exit, then stop backend
+          wait $GUI_PID 2>/dev/null
+          kill $BACKEND_PID 2>/dev/null
+          LAUNCH_EOF
+          chmod +x "$MACOS/launch.sh"
+
+          # Create Info.plist
+          cat > "$APP/Contents/Info.plist" << 'PLIST_EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key>
+              <string>TinyGradManager</string>
+              <key>CFBundleDisplayName</key>
+              <string>TinyGrad Manager</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.tinygrad.manager</string>
+              <key>CFBundleVersion</key>
+              <string>2.0.0</string>
+              <key>CFBundleShortVersionString</key>
+              <string>2.0.0</string>
+              <key>CFBundleExecutable</key>
+              <string>launch.sh</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>14.0</string>
+              <key>LSArchitecturePriority</key>
+              <array><string>arm64</string></array>
+              <key>LSUIElement</key>
+              <true/>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+              <key>NSRequiresAquaSystemAppearance</key>
+              <false/>
+          </dict>
+          </plist>
+          PLIST_EOF
+
+          echo "App bundle assembled: $APP"
+          du -sh "$APP"
+
+      - name: Ad-hoc code sign
+        run: |
+          APP="dist/TinyGradManager.app"
+
+          # Sign bundled dylibs/frameworks first, then the app
+          find "$APP/Contents/Resources" -name '*.dylib' -o -name '*.so' | while read f; do
+            codesign --force --sign - --timestamp=none "$f" 2>/dev/null || true
+          done
+
+          codesign --force --deep --sign - --timestamp=none "$APP"
+          echo "--- Signature ---"
+          codesign -dv "$APP" 2>&1 || true
 
       - name: Create DMG
         run: |
@@ -41,17 +165,19 @@ jobs:
           DMG_NAME="TinyGradManager"
           DMG_FILE="dist/${DMG_NAME}.dmg"
 
-          # 创建临时目录用于存放 .app
           TMP_DIR=$(mktemp -d)
           cp -R "$APP" "$TMP_DIR/"
+          # Create Applications symlink for drag-to-install
+          ln -s /Applications "$TMP_DIR/Applications"
 
-          # 创建 DMG
-          hdiutil create -volname "$DMG_NAME" -srcfolder "$TMP_DIR" -ov -format UDZO "$DMG_FILE"
+          hdiutil create -volname "$DMG_NAME" \
+            -srcfolder "$TMP_DIR" \
+            -ov -format UDZO \
+            -imagekey zlib-level=9 \
+            "$DMG_FILE"
 
-          # 清理临时目录
           rm -rf "$TMP_DIR"
-
-          echo "DMG created at $DMG_FILE"
+          echo "DMG: $DMG_FILE ($(du -sh "$DMG_FILE" | cut -f1))"
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
