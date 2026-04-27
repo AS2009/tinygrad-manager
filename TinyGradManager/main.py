@@ -154,7 +154,6 @@ class AppDelegate(NSObject):
                 # 暂存配置，实际使用时需根据配置构建模型
                 self.loaded_model = config
                 self.appendLog_("✅ Config loaded. (Model architecture not yet implemented)")
-                return
             elif self.model_path.endswith('.gguf'):
                 # 使用 gguf Python 库加载 GGUF 格式模型
                 try:

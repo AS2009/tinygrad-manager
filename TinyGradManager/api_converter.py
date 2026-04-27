@@ -3,7 +3,7 @@ import uvicorn
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import threading
 import time
 import asyncio
@@ -23,7 +23,7 @@ class ApiConverter:
     class ModelInfo(BaseModel):
         id: str
         object: str = "model"
-        created: int = int(time.time())
+        created: int = Field(default_factory=lambda: int(time.time()))
         owned_by: str = "tinygrad"
 
     def __init__(self):
@@ -49,9 +49,10 @@ class ApiConverter:
         async def list_models():
             if not self.model or not self.model_name:
                 return {"object": "list", "data": []}
+            model_info = self.ModelInfo(id=self.model_name)
             return {
                 "object": "list",
-                "data": [self.ModelInfo(id=self.model_name).model_dump()]
+                "data": [model_info.model_dump() if hasattr(model_info, 'model_dump') else model_info.dict()]
             }
 
         @self.app.post("/v1/chat/completions")
@@ -93,13 +94,14 @@ class ApiConverter:
     async def _stream_response(self, messages: List[Dict[str, str]], temperature: float, max_tokens: Optional[int]):
         prompt = self._format_prompt(messages)
         words = prompt.split()
-        # 修复：当 max_tokens 为 None 时取 20，为 0 时也应取 20
-        limit = max_tokens if max_tokens is not None else 20
-        for i, word in enumerate(words[:limit]):
+        limit = max_tokens if max_tokens else 20
+        chat_id = f"chatcmpl-{int(time.time())}"
+        created = int(time.time())
+        for word in words[:limit]:
             chunk = {
-                "id": f"chatcmpl-{int(time.time())}",
+                "id": chat_id,
                 "object": "chat.completion.chunk",
-                "created": int(time.time()),
+                "created": created,
                 "model": self.model_name,
                 "choices": [{"delta": {"content": word + " "}, "index": 0, "finish_reason": None}]
             }
@@ -108,7 +110,7 @@ class ApiConverter:
         yield "data: [DONE]\n\n"
 
     def _format_prompt(self, messages: List[Dict[str, str]]) -> str:
-        return "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+        return "\n".join([f"{m.get('role', 'user')}: {m.get('content', '')}" for m in messages])
 
     def start_service(self, port: int = 1234):
         if self.server_thread and self.server_thread.is_alive():

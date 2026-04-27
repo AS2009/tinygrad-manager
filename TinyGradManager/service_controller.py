@@ -36,14 +36,16 @@ def create_plist():
 def start_service():
     if not os.path.exists(PLIST_PATH):
         create_plist()
-    subprocess.run(["launchctl", "load", PLIST_PATH])
-    subprocess.run(["launchctl", "start", SERVICE_LABEL])
-    return True
+    r1 = subprocess.run(["launchctl", "load", PLIST_PATH])
+    if r1.returncode != 0:
+        return False
+    r2 = subprocess.run(["launchctl", "start", SERVICE_LABEL])
+    return r2.returncode == 0
 
 def stop_service():
-    subprocess.run(["launchctl", "stop", SERVICE_LABEL])
-    subprocess.run(["launchctl", "unload", PLIST_PATH])
-    return True
+    r1 = subprocess.run(["launchctl", "stop", SERVICE_LABEL])
+    r2 = subprocess.run(["launchctl", "unload", PLIST_PATH])
+    return r1.returncode == 0 and r2.returncode == 0
 
 def serve():
     """后台服务：初始化 tinygrad 运行时，保持运行"""
