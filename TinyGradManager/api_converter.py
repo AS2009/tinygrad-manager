@@ -1,12 +1,25 @@
 import json
-import uvicorn
-from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+import base64
+import io
 import threading
 import time
 import asyncio
+from typing import Optional, List, Dict, Any
+
+try:
+    import uvicorn
+    from fastapi import FastAPI, HTTPException
+    from fastapi.responses import StreamingResponse, JSONResponse
+    from pydantic import BaseModel, Field
+    _HAS_API_DEPS = True
+except ImportError:
+    _HAS_API_DEPS = False
+    # Stub classes for when deps are missing
+    class BaseModel:
+        pass
+    class Field:
+        def __init__(self, *args, **kwargs):
+            pass
 
 class ApiConverter:
     class Message(BaseModel):
@@ -26,8 +39,18 @@ class ApiConverter:
         created: int = Field(default_factory=lambda: int(time.time()))
         owned_by: str = "tinygrad"
 
+    class ImageGenerationRequest(BaseModel):
+        model: Optional[str] = None
+        prompt: str
+        negative_prompt: Optional[str] = ""
+        n: Optional[int] = 1
+        size: Optional[str] = "512x512"
+        response_format: Optional[str] = "url"
+        num_inference_steps: Optional[int] = 25
+        guidance_scale: Optional[float] = 7.5
+        seed: Optional[int] = None
+
     def __init__(self):
-        self.app = FastAPI(title="TinyGrad to LMStudio API Converter")
         self.model = None           # 存储模型对象（可以是state_dict或完整模型）
         self.model_name = None
         self.model_format = None    # 格式标识：safetensors / pytorch / gguf / mlx / json
@@ -36,7 +59,10 @@ class ApiConverter:
         self.server_port = 1234
         self._uvicorn_server = None  # 保存 uvicorn Server 引用以便优雅关闭
         self._lock = threading.Lock()  # 防止重复启动/停止竞态
-        self.setup_routes()
+        self.image_generator = None  # 文生图生成器引用
+        if _HAS_API_DEPS:
+            self.app = FastAPI(title="TinyGrad to LMStudio API Converter")
+            self.setup_routes()
 
     def set_model(self, model, model_name: str):
         """设置用于推理的模型，同时记录模型元信息。"""
@@ -59,6 +85,10 @@ class ApiConverter:
         else:
             self.model_format = "unknown"
         print(f"Model '{model_name}' ({self.model_format}, {self.model_keys_count} keys) set for API.")
+
+    def set_image_generator(self, image_generator):
+        """设置文生图生成器实例，用于 /v1/images/generations 端点。"""
+        self.image_generator = image_generator
 
     def is_ready(self):
         return self.model is not None
@@ -85,6 +115,56 @@ class ApiConverter:
                 )
             else:
                 return self._generate_response(request.messages, request.temperature, request.max_tokens)
+
+        @self.app.post("/v1/images/generations")
+        async def create_image_generation(request: ApiConverter.ImageGenerationRequest):
+            if self.image_generator is None or not self.image_generator.is_ready():
+                raise HTTPException(status_code=503, detail="No image model loaded. Load a Stable Diffusion model first.")
+
+            # Parse size string "WxH" or "W*H"
+            size = request.size.replace("*", "x")
+            try:
+                parts = size.split("x")
+                width = int(parts[0])
+                height = int(parts[1])
+            except (ValueError, IndexError):
+                width, height = 512, 512
+
+            image, meta = self.image_generator.generate(
+                prompt=request.prompt,
+                negative_prompt=request.negative_prompt or "",
+                width=width,
+                height=height,
+                num_inference_steps=request.num_inference_steps or 25,
+                guidance_scale=request.guidance_scale or 7.5,
+                seed=request.seed,
+            )
+
+            if image is None:
+                raise HTTPException(status_code=500, detail=meta.get("error", "Image generation failed"))
+
+            created = int(time.time())
+            data = []
+
+            for _ in range(min(request.n or 1, 1)):
+                if request.response_format == "b64_json":
+                    buf = io.BytesIO()
+                    image.save(buf, format="PNG")
+                    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+                    data.append({"b64_json": b64})
+                else:
+                    data.append({"url": f"file://{meta['filepath']}"})
+
+            return JSONResponse({
+                "created": created,
+                "data": data,
+                "meta": {
+                    "elapsed_seconds": meta.get("elapsed_seconds"),
+                    "width": meta.get("width"),
+                    "height": meta.get("height"),
+                    "steps": meta.get("steps"),
+                }
+            })
 
     def _generate_response(self, messages: List[Dict[str, str]], temperature: float, max_tokens: Optional[int]) -> Dict[str, Any]:
         prompt = self._format_prompt(messages)
@@ -141,11 +221,14 @@ class ApiConverter:
     def _format_prompt(self, messages: List[Dict[str, str]]) -> str:
         return "\n".join([f"{m.get('role', 'user')}: {m.get('content', '')}" for m in messages])
 
-    def start_service(self, port: int = 1234):
+    def start_service(self, port: int = 1234) -> bool:
+        if not _HAS_API_DEPS:
+            print("API dependencies not installed. Run: pip install fastapi uvicorn pydantic")
+            return False
         with self._lock:
             if self.server_thread and self.server_thread.is_alive():
                 print("Service is already running.")
-                return
+                return True
             self.server_port = port
             self._uvicorn_server = None
             def run():
@@ -156,8 +239,11 @@ class ApiConverter:
             self.server_thread = threading.Thread(target=run, daemon=True)
             self.server_thread.start()
             print(f"TinyGrad API service started on http://localhost:{port}")
+            return True
 
-    def stop_service(self):
+    def stop_service(self) -> bool:
+        if not _HAS_API_DEPS:
+            return False
         with self._lock:
             print("Stopping API service...")
             if self._uvicorn_server is not None:
@@ -166,3 +252,4 @@ class ApiConverter:
                 self.server_thread.join(timeout=5.0)
             self.server_thread = None
             self._uvicorn_server = None
+            return True

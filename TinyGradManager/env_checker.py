@@ -150,3 +150,113 @@ def get_available_runtimes() -> List[str]:
         return list(Device.get_available_devices())
     except:
         return []
+
+def get_available_gpu_devices() -> List[str]:
+    """Return GPU device strings usable by both tinygrad and PyTorch/diffusers.
+
+    Priority: CUDA devices first, then MPS (Apple Silicon), then CPU.
+    """
+    devices = []
+
+    # Check for CUDA GPUs via PyTorch
+    try:
+        import torch
+        cuda_count = torch.cuda.device_count()
+        for i in range(cuda_count):
+            name = torch.cuda.get_device_name(i)
+            devices.append(f"cuda:{i} ({name})")
+    except Exception:
+        pass
+
+    # Check for MPS (Apple Silicon)
+    try:
+        import torch
+        if torch.backends.mps.is_available():
+            devices.append("mps (Apple Silicon GPU)")
+    except Exception:
+        pass
+
+    # Also check tinygrad devices and map them
+    try:
+        from tinygrad import Device
+        tg_devices = list(Device.get_available_devices())
+        for d in tg_devices:
+            d_upper = d.upper()
+            if "CUDA" in d_upper and not any(dev.startswith("cuda:") for dev in devices):
+                # Try torch for CUDA count
+                try:
+                    import torch
+                    cuda_count = torch.cuda.device_count()
+                    for i in range(cuda_count):
+                        name = torch.cuda.get_device_name(i)
+                        dev_str = f"cuda:{i} ({name})"
+                        if dev_str not in devices:
+                            devices.append(dev_str)
+                except Exception:
+                    devices.append(d)
+            elif "METAL" in d_upper or "GPU" in d_upper or "ANE" in d_upper:
+                if "mps" not in str(devices).lower():
+                    devices.append("mps (Apple Silicon GPU)")
+    except Exception:
+        pass
+
+    # Fallback: CPU always available
+    devices.append("cpu")
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique = []
+    for d in devices:
+        if d not in seen:
+            seen.add(d)
+            unique.append(d)
+    return unique
+
+def parse_gpu_device_key(device_str: str) -> str:
+    """Extract the device key (e.g. 'cuda:0', 'mps', 'cpu') from a display string."""
+    if device_str.startswith("cuda:"):
+        # "cuda:0 (NVIDIA GeForce RTX 3080)" -> "cuda:0"
+        return device_str.split(" (")[0]
+    if device_str.startswith("mps"):
+        return "mps"
+    return "cpu"
+
+def check_diffusers() -> Dict[str, Any]:
+    """Check if diffusers and related packages are available for image generation."""
+    result = {
+        "diffusers_available": False,
+        "transformers_available": False,
+        "torch_available": False,
+        "stable_diffusion_ready": False,
+        "details": ""
+    }
+    try:
+        spec = importlib.util.find_spec("diffusers")
+        result["diffusers_available"] = spec is not None
+    except Exception:
+        pass
+    try:
+        spec = importlib.util.find_spec("transformers")
+        result["transformers_available"] = spec is not None
+    except Exception:
+        pass
+    try:
+        spec = importlib.util.find_spec("torch")
+        result["torch_available"] = spec is not None
+    except Exception:
+        pass
+
+    if result["diffusers_available"] and result["transformers_available"] and result["torch_available"]:
+        result["stable_diffusion_ready"] = True
+        result["details"] = "Stable Diffusion dependencies available"
+    else:
+        missing = []
+        if not result["diffusers_available"]:
+            missing.append("diffusers")
+        if not result["transformers_available"]:
+            missing.append("transformers")
+        if not result["torch_available"]:
+            missing.append("torch")
+        result["details"] = f"Missing: {', '.join(missing)}"
+
+    return result

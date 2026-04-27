@@ -16,7 +16,7 @@ from AppKit import (
     NSApplication, NSWindow, NSView,
     NSButton, NSTextField, NSScrollView, NSTextView, NSImageView,
     NSVisualEffectView, NSStatusBar, NSMenu, NSMenuItem,
-    NSMakeRect,
+    NSMakeRect, NSPopUpButton,
     NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
     NSBackingStoreBuffered,
@@ -26,6 +26,7 @@ import gpu_manager
 import service_controller
 import api_converter
 import env_checker
+import image_generator
 
 # ── Look up classes that may not have direct pyobjc wrappers ──────────────
 NSFont = objc.lookUpClass("NSFont")
@@ -122,7 +123,7 @@ class AppDelegate(NSObject):
 
     def applicationDidFinishLaunching_(self, notification):
         # ── Window ────────────────────────────────────────────────────────
-        win_w, win_h = 840, 700
+        win_w, win_h = 840, 920
         rect = NSMakeRect(100, 100, win_w, win_h)
         mask = (
             NSWindowStyleMaskTitled
@@ -196,7 +197,7 @@ class AppDelegate(NSObject):
         bg.addSubview_(sub_lbl)
 
         # ── Card 1: Model ─────────────────────────────────────────────────
-        c1_y, c1_h = 430, 175
+        c1_y, c1_h = 680, 175
         card1 = _glass_card(24, c1_y, win_w - 48, c1_h)
         bg.addSubview_(card1)
 
@@ -213,9 +214,23 @@ class AppDelegate(NSObject):
         )
         card1.addSubview_(self.model_path_label)
 
+        # GPU device for LLM
+        c1_w = win_w - 48  # card content width
+        lbl_gpu = _label("GPU for LLM:", 16, c1_h - 86, 110, 22,
+                         font_size=11, color=NSColor.secondaryLabelColor())
+        card1.addSubview_(lbl_gpu)
+
+        gpu_devices = env_checker.get_available_gpu_devices()
+        self.llm_gpu_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(
+            NSMakeRect(16, c1_h - 114, 260, 26), False
+        )
+        self.llm_gpu_popup.addItemsWithTitles_(gpu_devices)
+        if gpu_devices:
+            self.llm_gpu_popup.selectItemAtIndex_(0)
+        card1.addSubview_(self.llm_gpu_popup)
+
         # buttons
         btn_y = 22
-        c1_w = win_w - 48  # card content width
         browse_btn = _pill_button(
             "Browse...", self, "selectModelFile:",
             c1_w - 240, btn_y, 100, 32
@@ -228,58 +243,124 @@ class AppDelegate(NSObject):
         )
         card1.addSubview_(load_btn)
 
-        # ── Card 2: System ────────────────────────────────────────────────
-        c2_y, c2_h = 230, 180
-        card2 = _glass_card(24, c2_y, win_w - 48, c2_h)
-        bg.addSubview_(card2)
+        # ── Card 2: Text-to-Image ──────────────────────────────────────────
+        c2_y, c2_h = 470, 200
+        card_img = _glass_card(24, c2_y, win_w - 48, c2_h)
+        bg.addSubview_(card_img)
 
-        card2.addSubview_(_icon_view("cpu.fill", 16, c2_h - 26, 18, 18, 14))
-        card2.addSubview_(_label("System Status", 40, c2_h - 28, 200, 20,
+        card_img.addSubview_(_icon_view("photo.fill", 16, c2_h - 26, 18, 18, 14))
+        card_img.addSubview_(_label("Text-to-Image", 40, c2_h - 28, 200, 20,
+                                    font_size=13, weight=0.23))
+
+        # GPU device for image model
+        card_img.addSubview_(_label("GPU for Image:", 16, c2_h - 56, 110, 22,
+                                    font_size=11, color=NSColor.secondaryLabelColor()))
+        self.img_gpu_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(
+            NSMakeRect(16, c2_h - 80, 260, 26), False
+        )
+        self.img_gpu_popup.addItemsWithTitles_(gpu_devices)
+        if gpu_devices:
+            self.img_gpu_popup.selectItemAtIndex_(0)
+        card_img.addSubview_(self.img_gpu_popup)
+
+        # Model ID field
+        card_img.addSubview_(_label("Model ID:", 290, c2_h - 56, 60, 22,
+                                    font_size=11, color=NSColor.secondaryLabelColor()))
+        self.img_model_field = NSTextField.alloc().initWithFrame_(
+            NSMakeRect(290, c2_h - 80, 320, 26)
+        )
+        self.img_model_field.setStringValue_("runwayml/stable-diffusion-v1-5")
+        self.img_model_field.setFont_(NSFont.systemFontOfSize_weight_(11, 0.0))
+        self.img_model_field.setBezeled_(True)
+        self.img_model_field.setBezelStyle_(1)  # square bezel
+        card_img.addSubview_(self.img_model_field)
+
+        # Load Image Model button
+        load_img_btn = _pill_button(
+            "Load Image Model", self, "loadImageModel:",
+            c1_w - 160, c2_h - 82, 146, 32, primary=True
+        )
+        card_img.addSubview_(load_img_btn)
+
+        # Prompt field
+        card_img.addSubview_(_label("Prompt:", 16, c2_h - 116, 60, 22,
+                                    font_size=11, color=NSColor.secondaryLabelColor()))
+        self.img_prompt_field = NSTextField.alloc().initWithFrame_(
+            NSMakeRect(16, c2_h - 140, c1_w - 180, 26)
+        )
+        self.img_prompt_field.setStringValue_("a cat sitting on a cloud, digital art")
+        self.img_prompt_field.setFont_(NSFont.systemFontOfSize_weight_(11, 0.0))
+        self.img_prompt_field.setBezeled_(True)
+        self.img_prompt_field.setBezelStyle_(1)
+        card_img.addSubview_(self.img_prompt_field)
+
+        # Generate button
+        gen_btn = _pill_button(
+            "Generate Image", self, "generateImage:",
+            c1_w - 148, c2_h - 142, 134, 32, primary=True
+        )
+        card_img.addSubview_(gen_btn)
+
+        # Status label
+        self.img_status_label = _label(
+            "Status: No model loaded", 16, c2_h - 170, c1_w - 40, 22,
+            font_size=11,
+            color=NSColor.secondaryLabelColor()
+        )
+        card_img.addSubview_(self.img_status_label)
+
+        # ── Card 3: System ────────────────────────────────────────────────
+        c3_y, c3_h = 250, 200
+        card3 = _glass_card(24, c3_y, win_w - 48, c3_h)
+        bg.addSubview_(card3)
+
+        card3.addSubview_(_icon_view("cpu.fill", 16, c3_h - 26, 18, 18, 14))
+        card3.addSubview_(_label("System Status", 40, c3_h - 28, 200, 20,
                                  font_size=13, weight=0.23))
 
         # GPU info
         self.gpu_info_label = _label(
-            "Detecting GPU...", 16, c2_h - 56, 600, 22,
+            "Detecting GPU...", 16, c3_h - 56, 600, 22,
             font_size=12
         )
-        card2.addSubview_(self.gpu_info_label)
+        card3.addSubview_(self.gpu_info_label)
 
         # GPU service row
-        card2.addSubview_(_label("GPU Service", 16, c2_h - 94, 120, 22,
+        card3.addSubview_(_label("GPU Service", 16, c3_h - 94, 120, 22,
                                  font_size=12, weight=0.23))
         self.start_service_btn = _pill_button(
             "Start GPU Service", self, "toggleService:",
-            c1_w - 232, c2_h - 100, 180, 32
+            c1_w - 232, c3_h - 100, 180, 32
         )
-        card2.addSubview_(self.start_service_btn)
+        card3.addSubview_(self.start_service_btn)
 
         # API service row
         self.api_status_label = _label(
-            "API Service: Inactive", 16, c2_h - 138, 250, 22,
+            "API Service: Inactive", 16, c3_h - 138, 250, 22,
             font_size=12,
             color=NSColor.secondaryLabelColor()
         )
-        card2.addSubview_(self.api_status_label)
+        card3.addSubview_(self.api_status_label)
 
         self.toggle_api_btn = _pill_button(
             "Start API Service", self, "toggleApiService:",
-            c1_w - 232, c2_h - 144, 180, 32
+            c1_w - 232, c3_h - 144, 180, 32
         )
-        card2.addSubview_(self.toggle_api_btn)
+        card3.addSubview_(self.toggle_api_btn)
 
-        # ── Card 3: Console ───────────────────────────────────────────────
-        c3_y, c3_h = 20, 190
-        card3 = _glass_card(24, c3_y, win_w - 48, c3_h)
-        card3.setMaterial_(_MatHUD)  # darker glass for console
-        bg.addSubview_(card3)
+        # ── Card 4: Console ───────────────────────────────────────────────
+        c4_y, c4_h = 20, 230
+        card4 = _glass_card(24, c4_y, win_w - 48, c4_h)
+        card4.setMaterial_(_MatHUD)  # darker glass for console
+        bg.addSubview_(card4)
 
-        card3.addSubview_(_icon_view("terminal.fill", 16, c3_h - 26, 18, 18, 14))
-        card3.addSubview_(_label("Console", 40, c3_h - 28, 200, 20,
+        card4.addSubview_(_icon_view("terminal.fill", 16, c4_h - 26, 18, 18, 14))
+        card4.addSubview_(_label("Console", 40, c4_h - 28, 200, 20,
                                  font_size=13, weight=0.23))
 
         # log area
         scroll_view = NSScrollView.alloc().initWithFrame_(
-            NSMakeRect(12, 10, win_w - 72, c3_h - 50)
+            NSMakeRect(12, 10, win_w - 72, c4_h - 50)
         )
         scroll_view.setHasVerticalScroller_(True)
         scroll_view.setBorderType_(0)  # no border — card already has one
@@ -300,10 +381,13 @@ class AppDelegate(NSObject):
         self.log_textview.setFont_(mono_font)
         self.log_textview.setTextColor_(NSColor.labelColor())
         scroll_view.setDocumentView_(self.log_textview)
-        card3.addSubview_(scroll_view)
+        card4.addSubview_(scroll_view)
 
         # ── Init ──────────────────────────────────────────────────────────
+        self.image_gen = image_generator.ImageGenerator()
+        self.image_gen.set_log_callback(self.appendLog_)
         self.api_converter = api_converter.ApiConverter()
+        self.api_converter.set_image_generator(self.image_gen)
         self.loaded_model = None
         self.model_path = None
 
@@ -358,6 +442,22 @@ class AppDelegate(NSObject):
         if not self.model_path:
             self.appendLog_("[ERROR] No model file selected.")
             return
+
+        # Set GPU device for LLM
+        selected_device = self.llm_gpu_popup.titleOfSelectedItem()
+        if selected_device:
+            device_key = env_checker.parse_gpu_device_key(selected_device)
+            self.appendLog_(f"[GPU] Setting LLM device to: {device_key}")
+            try:
+                from tinygrad import Device
+                Device.DEFAULT = device_key.upper()
+                if device_key.startswith("cuda"):
+                    cuda_idx = device_key.split(":")[-1]
+                    Device.DEFAULT = f"CUDA:{cuda_idx}"
+                elif device_key == "mps":
+                    Device.DEFAULT = "METAL"
+            except Exception as e:
+                self.appendLog_(f"[WARN] Could not set tinygrad device: {e}")
 
         self.appendLog_(f"[...] Loading model from {self.model_path}...")
         try:
@@ -419,6 +519,58 @@ class AppDelegate(NSObject):
             self.appendLog_(f"[ERROR] Failed to load model: {str(e)}")
             self.appendLog_(f"   {traceback.format_exc()}")
 
+    def loadImageModel_(self, sender):
+        """Load a Stable Diffusion model on the selected GPU."""
+        model_id = self.img_model_field.stringValue()
+        if not model_id.strip():
+            self.appendLog_("[IMG ERROR] No model ID specified.")
+            return
+
+        selected_device = self.img_gpu_popup.titleOfSelectedItem()
+        device_key = env_checker.parse_gpu_device_key(selected_device or "cpu")
+        self.appendLog_(f"[IMG] Loading image model '{model_id}' on {device_key}...")
+        self.img_status_label.setStringValue_("Status: Loading model...")
+
+        def _load():
+            success, msg = self.image_gen.load_model(model_id, device_key)
+            if success:
+                self.img_status_label.setStringValue_(f"Status: Ready ({model_id})")
+            else:
+                self.img_status_label.setStringValue_(f"Status: Load failed")
+            self.appendLog_(f"[IMG] {msg}")
+
+        import threading
+        t = threading.Thread(target=_load, daemon=True)
+        t.start()
+
+    def generateImage_(self, sender):
+        """Generate an image from the text prompt."""
+        if not self.image_gen.is_ready():
+            self.appendLog_("[IMG ERROR] No image model loaded. Load a model first.")
+            self.img_status_label.setStringValue_("Status: No model loaded")
+            return
+
+        prompt = self.img_prompt_field.stringValue()
+        if not prompt.strip():
+            self.appendLog_("[IMG ERROR] No prompt specified.")
+            return
+
+        self.img_status_label.setStringValue_("Status: Generating...")
+        self.appendLog_(f"[IMG] Prompt: {prompt}")
+
+        def _gen():
+            image, meta = self.image_gen.generate(prompt=prompt)
+            if image is not None:
+                self.img_status_label.setStringValue_(
+                    f"Status: Done in {meta['elapsed_seconds']}s → {meta['filename']}"
+                )
+            else:
+                self.img_status_label.setStringValue_(f"Status: Error - {meta.get('error', 'unknown')}")
+
+        import threading
+        t = threading.Thread(target=_gen, daemon=True)
+        t.start()
+
     def detectGPU_(self, sender):
         gpu_info = gpu_manager.get_gpu_info()
         self.gpu_info_label.setStringValue_(f"GPU: {gpu_info}")
@@ -450,19 +602,25 @@ class AppDelegate(NSObject):
     def toggleApiService_(self, sender):
         if self.toggle_api_btn.title() == "Start API Service":
             self.appendLog_("[API] Starting API conversion service...")
-            if not self.api_converter.is_ready():
-                self.appendLog_("[ERROR] No model loaded for API service. Please load a model first.")
+            if not self.api_converter.is_ready() and not self.image_gen.is_ready():
+                self.appendLog_("[ERROR] No model loaded for API service. Please load an LLM or image model first.")
                 return
-            self.api_converter.start_service(port=1234)
-            self.toggle_api_btn.setTitle_("Stop API Service")
-            self.api_status_label.setStringValue_("API Service: Active (Port 1234)")
-            self.appendLog_("[OK] API service started on http://localhost:1234")
+            success = self.api_converter.start_service(port=1234)
+            if success:
+                self.toggle_api_btn.setTitle_("Stop API Service")
+                self.api_status_label.setStringValue_("API Service: Active (Port 1234)")
+                self.appendLog_("[OK] API service started on http://localhost:1234")
+            else:
+                self.appendLog_("[ERROR] Failed to start API service. Install: pip install fastapi uvicorn pydantic")
         else:
             self.appendLog_("[STOP] Stopping API service...")
-            self.api_converter.stop_service()
-            self.toggle_api_btn.setTitle_("Start API Service")
-            self.api_status_label.setStringValue_("API Service: Inactive")
-            self.appendLog_("[OK] API service stopped.")
+            success = self.api_converter.stop_service()
+            if success:
+                self.toggle_api_btn.setTitle_("Start API Service")
+                self.api_status_label.setStringValue_("API Service: Inactive")
+                self.appendLog_("[OK] API service stopped.")
+            else:
+                self.appendLog_("[WARN] API service stop skipped (deps not installed).")
 
     def appendLog_(self, message):
         current_text = self.log_textview.string()
