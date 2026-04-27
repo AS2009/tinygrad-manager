@@ -1,7 +1,6 @@
 import subprocess
 import sys
 import importlib.util
-import os
 import shutil
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -84,10 +83,42 @@ def check_cuda() -> Dict[str, Any]:
     return result
 
 def check_amd_compiler() -> Dict[str, Any]:
-    return {"available": False, "lib_comgr_path": None, "details": ""}
+    """检测 AMD GPU / ROCm 编译器。macOS 上检测 AMD 显卡存在性。"""
+    result = {"available": False, "details": ""}
+    if sys.platform == "darwin":
+        success, output = run_command("system_profiler SPDisplaysDataType", timeout=8)
+        if success and "AMD" in output:
+            result["available"] = True
+            for line in output.split('\n'):
+                if "AMD" in line:
+                    result["details"] = line.strip()
+                    break
+        else:
+            result["details"] = "No AMD GPU found"
+    else:
+        # Linux: check for ROCm
+        rocm_path = shutil.which("hipcc") or shutil.which("amdclang")
+        if rocm_path:
+            result["available"] = True
+            result["details"] = f"ROCm compiler found: {rocm_path}"
+        else:
+            result["details"] = "ROCm compiler not found"
+    return result
 
 def check_egpu_hardware() -> Dict[str, Any]:
-    return {"detected": False, "gpu_list": [], "details": ""}
+    """通过 SafeEjectGPU 检测外置 GPU (eGPU)。"""
+    result = {"detected": False, "gpu_list": [], "details": ""}
+    if sys.platform != "darwin":
+        result["details"] = "Not macOS"
+        return result
+    success, output = run_command("SafeEjectGPU gpus", timeout=8)
+    if success and output:
+        result["detected"] = True
+        result["gpu_list"] = [line.strip() for line in output.split('\n') if line.strip()]
+        result["details"] = output.strip()
+    else:
+        result["details"] = "No eGPU detected or SafeEjectGPU unavailable"
+    return result
 
 def check_environment() -> Dict[str, Any]:
     return {

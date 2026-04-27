@@ -22,8 +22,6 @@ from AppKit import (
     NSBackingStoreBuffered,
     NSOpenPanel, NSModalResponseOK,
 )
-from threading import Thread
-
 import gpu_manager
 import service_controller
 import api_converter

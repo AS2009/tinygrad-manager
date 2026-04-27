@@ -1,106 +1,93 @@
-# TinyGrad Manager 🚀
+# TinyGrad Manager
 
-macOS 桌面应用程序，用于管理 [TinyGrad](https://github.com/tinygrad/tinygrad) 模型的加载、GPU 服务控制以及 OpenAI 兼容 API 的转换服务。(注：此项目完全由 DeepSeek 完成)
+macOS 原生菜单栏应用，采用 **Apple Liquid Glass** 设计语言。用于管理 [TinyGrad](https://github.com/tinygrad/tinygrad) 深度学习框架的模型加载、GPU 服务控制，以及提供 OpenAI 兼容的 HTTP API。
+
+## 截图预览
+
+应用以菜单栏图标形态常驻，点击图标弹出控制窗口（840×700）。窗口采用毛玻璃材质卡片式布局，支持深色/浅色模式自动适配。
 
 ## 功能特性
 
-### 📦 模型加载与管理
-- 支持 `.safetensors`、`.pth`、`.pt`、`.gguf`、`.mlx`、`.json` 等多种模型文件格式
-- 通过图形界面浏览并选择本地模型文件
-- 自动检测并显示模型权重信息
+### 模型管理
+- 图形界面浏览和选择本地模型文件
+- 支持格式：`.safetensors`、`.pth` / `.pt`、`.gguf`、`.mlx`、`.json`
+- 加载后自动解析权重结构，传递给 API 转换器
 
-### 💻 GPU 监控
-- 自动检测并显示系统 GPU 信息
-- Metal 加速支持（macOS）
-- eGPU 外置显卡检测与配置
+### GPU 监控
+- 启动时自动检测系统 GPU 型号（`system_profiler`）
+- Metal 加速可用性检查
+- eGPU 外置显卡检测
 
-### 🌐 OpenAI 兼容 API 服务
-- 将本地 TinyGrad 模型转换为 OpenAI 兼容的 API 接口
-- 支持流式（Streaming）和非流式响应
-- 兼容 LMStudio、OpenAI SDK 等工具
-- 默认端口：`1234`
+### 后台服务
+- **GPU Service**：通过 `launchctl` 管理 TinyGrad 运行时守护进程
+- **API Service**：一键启动 FastAPI + uvicorn，将本地模型暴露为 HTTP API
 
-### ⚙️ GPU 服务控制
-- 一键启动/停止 TinyGrad 运行时服务
-- 通过 `launchctl` 管理后台服务
-- 环境检测与诊断报告
+### OpenAI 兼容 API
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/models` | GET | 列出已加载的模型 |
+| `/v1/chat/completions` | POST | 聊天补全（支持 `stream: true`） |
+
+默认监听 `http://localhost:1234`，可直接替换 OpenAI SDK 的 `base_url` 使用。
+
+### 菜单栏驻留
+- 关闭窗口 → 最小化到 macOS 菜单栏，**不退出应用**
+- **不显示 Dock 图标**（`LSUIElement` / `NSApplicationActivationPolicyAccessory`）
+- 菜单栏下拉菜单：Show/Hide 窗口 / Quit 退出
+
+## 界面设计
+
+基于 **macOS 26 Liquid Glass** 设计规范：
+
+- 全窗口 `NSVisualEffectView` 磨砂玻璃背景（`underWindowBackground` 材质）
+- 三张玻璃质感卡片：Model File、System Status、Console
+- 卡片圆角 14pt，半透明边框，`contentBackground` 材质
+- **SF Symbols** 图标体系（`shippingbox.fill`、`cpu.fill`、`doc.fill`、`terminal.fill`）
+- 系统字体 SF Pro，多级字重（Bold 26pt / Medium 13pt / Regular 11-12pt）
+- 按钮使用系统强调色，圆角 pill 样式
+- 透明标题栏 + 全尺寸内容视图
 
 ## 系统要求
 
-- **操作系统**：macOS 12.0+
-- **Python**：3.10+
-- **依赖**：详见 [requirements.txt](requirements.txt)
+| 项目 | 要求 |
+|------|------|
+| 操作系统 | macOS 12.0+（Monterey 及以上） |
+| Python | 3.10+ |
+| 架构 | Apple Silicon（M 系列）/ Intel Mac |
 
 ## 快速开始
 
-### 1. 克隆仓库
-
 ```bash
-git clone https://github.com/yourusername/tinygrad-manager.git
-cd tinygrad-manager
-```
-
-### 2. 安装依赖
-
-```bash
+# 安装依赖
 pip install -r requirements.txt
-```
 
-### 3. 运行应用程序
-
-```bash
+# 运行
 python TinyGradManager/main.py
 ```
+
+应用启动后出现在**菜单栏**（非 Dock），点击菜单栏图标打开控制窗口。
 
 ## 使用指南
 
 ### 加载模型
-1. 点击 **"Browse..."** 选择模型文件（支持 `.safetensors`、`.pth`、`.pt`、`.gguf`、`.mlx`、`.json`）
-2. 点击 **"Load Model"** 加载模型
-3. 加载成功后，模型会传递给 API 转换器
 
-### 支持的模型格式
-
-| 格式 | 扩展名 | 说明 |
-|------|--------|------|
-| SafeTensors | `.safetensors` | 安全、快速的权重序列化格式，广泛用于 Hugging Face 模型 |
-| PyTorch | `.pth` / `.pt` | PyTorch 原生模型权重格式 |
-| GGUF | `.gguf` | llama.cpp 项目使用的量化模型格式，适合在 CPU/Metal 上高效推理 |
-| MLX | `.mlx` / `.safetensors` | Apple MLX 框架模型格式，针对 Apple Silicon 优化 |
-| JSON | `.json` | 模型配置文件 |
-
-#### GGUF 格式说明
-GGUF（GGML Universal Format）是 llama.cpp 生态系统广泛使用的模型格式，支持模型量化以降低内存占用。加载 GGUF 模型需要安装 `gguf` Python 包：
-```bash
-pip install gguf
-```
-
-#### MLX 格式说明
-MLX 是 Apple 专为 Apple Silicon（M 系列芯片）设计的机器学习框架。MLX 模型通常以 `.safetensors` 权重文件或 `.mlx` 文件形式存在。加载 MLX 模型需要安装 `mlx` Python 包：
-```bash
-pip install mlx
-```
-
-### 启动 GPU 服务
-- 点击 **"Start GPU Service"** 初始化 TinyGrad 运行时
-- 服务启动后按钮变为 **"Stop GPU Service"**
+1. 点击 **Browse...** 选择本地模型文件
+2. 点击 **Load Model** 加载权重
+3. 状态日志显示在 Console 卡片中
 
 ### 启动 API 服务
-1. 确保模型已加载
-2. 点击 **"Start API Service"**
-3. API 服务将在 `http://localhost:1234` 启动
-4. 支持 OpenAI 兼容的端点：
-   - `GET /v1/models` — 列出可用模型
-   - `POST /v1/chat/completions` — 聊天补全（支持 `stream` 模式）
 
-### 使用 OpenAI SDK 调用
+1. 确保模型已加载
+2. 点击 **Start API Service**
+3. 使用 OpenAI SDK 调用：
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:1234/v1",
-    api_key="not-needed"  # TinyGrad API 不需要密钥
+    api_key="not-needed"
 )
 
 response = client.chat.completions.create(
@@ -113,27 +100,45 @@ for chunk in response:
     print(chunk.choices[0].delta.content, end="")
 ```
 
+## 支持的模型格式
+
+| 格式 | 扩展名 | 依赖 | 说明 |
+|------|--------|------|------|
+| SafeTensors | `.safetensors` | tinygrad | Hugging Face 广泛使用的安全权重格式 |
+| PyTorch | `.pth` / `.pt` | tinygrad | PyTorch 原生格式 |
+| GGUF | `.gguf` | `pip install gguf` | llama.cpp 量化格式，适合 CPU/Metal 推理 |
+| MLX | `.mlx` | `pip install mlx` | Apple MLX 框架，针对 M 系列芯片优化 |
+| JSON Config | `.json` | — | 模型配置文件 |
+
+## 环境检测
+
+启动时自动输出诊断报告：
+
+- TinyGrad 版本及默认设备
+- Metal 图形加速可用性
+- CUDA 编译器检测
+- Python 运行时版本
+- 可用计算后端列表
+
 ## 项目结构
 
 ```
 tinygrad-manager/
 ├── TinyGradManager/
-│   ├── __init__.py          # 包初始化
-│   ├── main.py              # 主入口 - macOS 原生 GUI 应用
-│   ├── api_converter.py     # OpenAI 兼容 API 转换器
-│   ├── env_checker.py       # 环境检测工具
-│   ├── gpu_manager.py       # GPU 信息管理
-│   └── service_controller.py # launchctl 服务控制
+│   ├── __init__.py           # 包标记
+│   ├── main.py               # 主入口：Liquid Glass GUI + 菜单栏
+│   ├── api_converter.py      # FastAPI 服务器（OpenAI 兼容端点）
+│   ├── env_checker.py        # 环境诊断
+│   ├── gpu_manager.py        # GPU / eGPU 检测
+│   └── service_controller.py # launchctl 守护进程管理
 ├── .github/workflows/
-│   └── main.yml             # CI/CD - macOS .app 构建与 DMG 打包
-├── requirements.txt         # Python 依赖
-├── setup.py                 # py2app 打包配置
-└── README.md                # 本文件
+│   └── main.yml              # CI：py2app 构建 → 签名 → DMG 打包
+├── requirements.txt
+├── setup.py                  # py2app 配置
+└── README.md
 ```
 
-## 打包为 macOS 应用程序
-
-项目支持通过 GitHub Actions 自动构建或本地手动构建：
+## 打包为 .app
 
 ### 本地构建
 
@@ -142,30 +147,25 @@ pip install py2app
 python setup.py py2app
 ```
 
-构建完成后，应用程序位于 `dist/TinyGradManager.app`，可直接运行。
+构建产物位于 `dist/TinyGradManager.app`。
 
-### 自动构建
+### CI 自动构建
 
-推送至 `main` 分支后，GitHub Actions 会自动构建并生成 `.dmg` 安装包。
+推送至 `main` 分支后，GitHub Actions 自动构建并上传 `.dmg` 安装包。构建流程：
+1. macOS runner 安装依赖
+2. py2app 打包为 `.app` bundle
+3. ad-hoc 代码签名
+4. hdiutil 创建 `.dmg` 磁盘镜像
 
-## 环境检测
+## 技术栈
 
-应用启动时会自动检测并显示：
-
-| 项目 | 说明 |
+| 组件 | 技术 |
 |------|------|
-| TinyGrad | 是否安装及其版本 |
-| Metal | macOS 图形加速 |
-| CUDA | NVIDIA GPU 支持 |
-| eGPU | 外置显卡状态 |
-| Python | 运行时版本 |
-
-## 依赖项
-
-- **[tinygrad](https://github.com/tinygrad/tinygrad)** — 深度学习框架
-- **pyobjc / pyobjc-framework-Cocoa** — macOS 原生 GUI
-- **FastAPI + uvicorn** — API 服务
-- **pydantic** — 数据验证
+| GUI 框架 | AppKit (pyobjc) — NSVisualEffectView + SF Symbols |
+| 深度学习 | [tinygrad](https://github.com/tinygrad/tinygrad) |
+| API 服务 | FastAPI + uvicorn + pydantic |
+| 后台服务 | macOS launchctl (LaunchAgent plist) |
+| 打包 | py2app → .app → DMG |
 
 ## License
 

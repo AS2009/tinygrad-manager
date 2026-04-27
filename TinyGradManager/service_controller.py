@@ -1,9 +1,13 @@
 import subprocess
 import os
 import sys
+import signal
 
 SERVICE_LABEL = "com.tinygrad.manager.service"
 PLIST_PATH = os.path.expanduser(f"~/Library/LaunchAgents/{SERVICE_LABEL}.plist")
+
+# Use the same Python that runs the GUI, not a hardcoded path
+_PYTHON_BIN = sys.executable
 
 def create_plist():
     plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -14,7 +18,7 @@ def create_plist():
     <string>{SERVICE_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>{_PYTHON_BIN}</string>
         <string>{os.path.abspath(__file__)}</string>
         <string>--serve</string>
     </array>
@@ -48,19 +52,32 @@ def stop_service():
     return r1.returncode == 0 and r2.returncode == 0
 
 def serve():
-    """后台服务：初始化 tinygrad 运行时，保持运行"""
+    """后台服务：初始化 tinygrad 运行时并保持运行，支持优雅退出"""
     print("TinyGrad GPU service starting...")
+    running = True
+
+    def _handle_signal(signum, frame):
+        nonlocal running
+        print(f"Received signal {signum}, shutting down...")
+        running = False
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
     try:
         from tinygrad import Device
         default_device = Device.DEFAULT
         print(f"Initialized default device: {default_device}")
     except Exception as e:
         print(f"Error initializing tinygrad: {e}")
+        return 1
 
     import time
-    while True:
-        time.sleep(10)
+    while running:
+        time.sleep(5)
+    print("GPU service stopped.")
+    return 0
 
 if __name__ == "__main__":
     if "--serve" in sys.argv:
-        serve()
+        sys.exit(serve())
