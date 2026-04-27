@@ -171,9 +171,9 @@ class AppDelegate(NSObject):
         show_item.setTarget_(self)
         status_menu.addItem_(NSMenuItem.separatorItem())
         quit_item = status_menu.addItemWithTitle_action_keyEquivalent_(
-            "Quit", "terminate:", "q"
+            "Quit TinyGrad Manager", "quitApp:", "q"
         )
-        quit_item.setTarget_(NSApp)
+        quit_item.setTarget_(self)
         self.status_item.setMenu_(status_menu)
 
         # ── Header ────────────────────────────────────────────────────────
@@ -310,7 +310,14 @@ class AppDelegate(NSObject):
         self.detectGPU_(None)
         self.checkLocalEnvironment()
 
+        # Bring window to front (needed in accessory mode)
+        NSApp.activateIgnoringOtherApps_(True)
+
     # ── Window / Status Bar ──────────────────────────────────────────────
+
+    def applicationShouldTerminate_(self, app):
+        """Allow termination without prompt."""
+        return 0  # NSTerminateNow
 
     def windowShouldClose_(self, notification):
         """Close button hides to menu bar instead of quitting."""
@@ -324,6 +331,10 @@ class AppDelegate(NSObject):
         else:
             self.window.makeKeyAndOrderFront_(None)
             NSApp.activateIgnoringOtherApps_(True)
+
+    def quitApp_(self, sender):
+        """Explicit quit — terminate the application."""
+        NSApp.terminate_(None)
 
     # ── Actions (unchanged logic) ────────────────────────────────────────
 
