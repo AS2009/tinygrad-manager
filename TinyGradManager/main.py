@@ -11,12 +11,12 @@ if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
 sys.path.insert(0, os.path.dirname(__file__))
 
 import objc
-from Foundation import NSObject, NSRunLoop, NSLog
+from Foundation import NSObject, NSRunLoop, NSLog, NSThread
 from AppKit import (
     NSApplication, NSWindow, NSView,
     NSButton, NSTextField, NSScrollView, NSTextView, NSImageView,
     NSVisualEffectView, NSStatusBar, NSMenu, NSMenuItem,
-    NSMakeRect, NSPopUpButton,
+    NSMakeRect,
     NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
     NSBackingStoreBuffered,
@@ -33,6 +33,7 @@ NSFont = objc.lookUpClass("NSFont")
 NSColor = objc.lookUpClass("NSColor")
 NSImage = objc.lookUpClass("NSImage")
 NSImageSymbolConfiguration = objc.lookUpClass("NSImageSymbolConfiguration")
+NSPopUpButton = objc.lookUpClass("NSPopUpButton")
 
 # ── Visual effect constants ────────────────────────────────────────────────
 # AppKit enums — using integer values for safety with pyobjc
@@ -221,13 +222,17 @@ class AppDelegate(NSObject):
         card1.addSubview_(lbl_gpu)
 
         gpu_devices = env_checker.get_available_gpu_devices()
-        self.llm_gpu_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(
-            NSMakeRect(16, c1_h - 114, 260, 26), False
-        )
-        self.llm_gpu_popup.addItemsWithTitles_(gpu_devices)
-        if gpu_devices:
-            self.llm_gpu_popup.selectItemAtIndex_(0)
-        card1.addSubview_(self.llm_gpu_popup)
+        try:
+            self.llm_gpu_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(
+                NSMakeRect(16, c1_h - 114, 260, 26), False
+            )
+            self.llm_gpu_popup.addItemsWithTitles_(gpu_devices)
+            if gpu_devices:
+                self.llm_gpu_popup.selectItemAtIndex_(0)
+            card1.addSubview_(self.llm_gpu_popup)
+        except Exception:
+            self.llm_gpu_popup = None
+            self.appendLog_("[WARN] Could not create GPU selector popup.")
 
         # buttons
         btn_y = 22
@@ -255,13 +260,17 @@ class AppDelegate(NSObject):
         # GPU device for image model
         card_img.addSubview_(_label("GPU for Image:", 16, c2_h - 56, 110, 22,
                                     font_size=11, color=NSColor.secondaryLabelColor()))
-        self.img_gpu_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(
-            NSMakeRect(16, c2_h - 80, 260, 26), False
-        )
-        self.img_gpu_popup.addItemsWithTitles_(gpu_devices)
-        if gpu_devices:
-            self.img_gpu_popup.selectItemAtIndex_(0)
-        card_img.addSubview_(self.img_gpu_popup)
+        try:
+            self.img_gpu_popup = NSPopUpButton.alloc().initWithFrame_pullsDown_(
+                NSMakeRect(16, c2_h - 80, 260, 26), False
+            )
+            self.img_gpu_popup.addItemsWithTitles_(gpu_devices)
+            if gpu_devices:
+                self.img_gpu_popup.selectItemAtIndex_(0)
+            card_img.addSubview_(self.img_gpu_popup)
+        except Exception:
+            self.img_gpu_popup = None
+            self.appendLog_("[WARN] Could not create image GPU selector popup.")
 
         # Model ID field
         card_img.addSubview_(_label("Model ID:", 290, c2_h - 56, 60, 22,
@@ -444,7 +453,7 @@ class AppDelegate(NSObject):
             return
 
         # Set GPU device for LLM
-        selected_device = self.llm_gpu_popup.titleOfSelectedItem()
+        selected_device = self.llm_gpu_popup.titleOfSelectedItem() if self.llm_gpu_popup else None
         if selected_device:
             device_key = env_checker.parse_gpu_device_key(selected_device)
             self.appendLog_(f"[GPU] Setting LLM device to: {device_key}")
@@ -526,7 +535,7 @@ class AppDelegate(NSObject):
             self.appendLog_("[IMG ERROR] No model ID specified.")
             return
 
-        selected_device = self.img_gpu_popup.titleOfSelectedItem()
+        selected_device = self.img_gpu_popup.titleOfSelectedItem() if self.img_gpu_popup else None
         device_key = env_checker.parse_gpu_device_key(selected_device or "cpu")
         self.appendLog_(f"[IMG] Loading image model '{model_id}' on {device_key}...")
         self.img_status_label.setStringValue_("Status: Loading model...")
@@ -623,6 +632,11 @@ class AppDelegate(NSObject):
                 self.appendLog_("[WARN] API service stop skipped (deps not installed).")
 
     def appendLog_(self, message):
+        if not NSThread.isMainThread():
+            self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "appendLog:", message, False
+            )
+            return
         current_text = self.log_textview.string()
         new_text = f"{current_text}\n> {message}" if current_text else f"> {message}"
         self.log_textview.setString_(new_text)
