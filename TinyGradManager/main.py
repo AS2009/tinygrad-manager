@@ -15,7 +15,7 @@ from Foundation import NSObject, NSRunLoop, NSLog
 from AppKit import (
     NSApplication, NSWindow, NSView,
     NSButton, NSTextField, NSScrollView, NSTextView, NSImageView,
-    NSVisualEffectView,
+    NSVisualEffectView, NSStatusBar, NSMenu, NSMenuItem,
     NSMakeRect,
     NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
@@ -153,6 +153,31 @@ class AppDelegate(NSObject):
         bg.setAutoresizingMask_(2 | 4)  # width | height
         content_view.addSubview_(bg)
 
+        # ── Status Bar & Window Delegate ──────────────────────────────────
+        self.window.setDelegate_(self)
+
+        self.status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(-1)
+        status_btn = self.status_item.button()
+        status_icon = _sf_symbol("cpu", 15.0)
+        if status_icon:
+            status_btn.setImage_(status_icon)
+        else:
+            status_btn.setTitle_("TG")
+            status_btn.setFont_(NSFont.systemFontOfSize_weight_(11, 0.4))
+        status_btn.setToolTip_("TinyGrad Manager")
+
+        status_menu = NSMenu.alloc().init()
+        show_item = status_menu.addItemWithTitle_action_keyEquivalent_(
+            "Show/Hide TinyGrad Manager", "toggleWindow:", ""
+        )
+        show_item.setTarget_(self)
+        status_menu.addItem_(NSMenuItem.separatorItem())
+        quit_item = status_menu.addItemWithTitle_action_keyEquivalent_(
+            "Quit", "terminate:", "q"
+        )
+        quit_item.setTarget_(NSApp)
+        self.status_item.setMenu_(status_menu)
+
         # ── Header ────────────────────────────────────────────────────────
         header_y = win_h - 64  # 64px from top, clears traffic-light buttons
 
@@ -286,6 +311,21 @@ class AppDelegate(NSObject):
 
         self.detectGPU_(None)
         self.checkLocalEnvironment()
+
+    # ── Window / Status Bar ──────────────────────────────────────────────
+
+    def windowShouldClose_(self, notification):
+        """Close button hides to menu bar instead of quitting."""
+        self.window.orderOut_(None)
+        return False
+
+    def toggleWindow_(self, sender):
+        """Toggle window visibility from status bar menu."""
+        if self.window.isVisible():
+            self.window.orderOut_(None)
+        else:
+            self.window.makeKeyAndOrderFront_(None)
+            NSApp.activateIgnoringOtherApps_(True)
 
     # ── Actions (unchanged logic) ────────────────────────────────────────
 
@@ -425,6 +465,7 @@ class AppDelegate(NSObject):
 
 if __name__ == "__main__":
     app = NSApplication.sharedApplication()
+    app.setActivationPolicy_(1)  # NSApplicationActivationPolicyAccessory — hide Dock icon
     delegate = AppDelegate.alloc().init()
     app.setDelegate_(delegate)
     app.run()

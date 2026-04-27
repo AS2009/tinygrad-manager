@@ -34,6 +34,7 @@ OPTIONS = {
         'CFBundleShortVersionString': '1.0.0',
         'NSHumanReadableCopyright': 'Copyright © 2025',
         'NSHighResolutionCapable': True,
+        'LSUIElement': True,  # hide Dock icon, menu-bar-only app
         'LSMinimumSystemVersion': '12.0',
     },
     'site_packages': True,
