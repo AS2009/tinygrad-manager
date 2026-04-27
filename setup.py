@@ -25,7 +25,9 @@ OPTIONS = {
         'pydantic_core', 'pydantic_core._pydantic_core',
         'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer',
     ],
-    'excludes': ['tkinter', 'matplotlib', 'pandas', 'test', 'PIL'],
+    'excludes': ['tkinter', 'matplotlib', 'pandas', 'test', 'PIL',
+                 'torch', 'diffusers', 'transformers', 'accelerate', 'safetensors',
+                 'image_generator'],
     'plist': {
         'CFBundleName': 'TinyGradManager',
         'CFBundleDisplayName': 'TinyGrad Manager',

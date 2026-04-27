@@ -26,7 +26,12 @@ import gpu_manager
 import service_controller
 import api_converter
 import env_checker
-import image_generator
+
+try:
+    import image_generator
+    _HAS_IMAGE_GEN = True
+except ImportError:
+    _HAS_IMAGE_GEN = False
 
 # ── Look up classes that may not have direct pyobjc wrappers ──────────────
 NSFont = objc.lookUpClass("NSFont")
@@ -393,10 +398,13 @@ class AppDelegate(NSObject):
         card4.addSubview_(scroll_view)
 
         # ── Init ──────────────────────────────────────────────────────────
-        self.image_gen = image_generator.ImageGenerator()
-        self.image_gen.set_log_callback(self.appendLog_)
         self.api_converter = api_converter.ApiConverter()
-        self.api_converter.set_image_generator(self.image_gen)
+        if _HAS_IMAGE_GEN:
+            self.image_gen = image_generator.ImageGenerator()
+            self.image_gen.set_log_callback(self.appendLog_)
+            self.api_converter.set_image_generator(self.image_gen)
+        else:
+            self.image_gen = None
         self.loaded_model = None
         self.model_path = None
 
@@ -530,6 +538,9 @@ class AppDelegate(NSObject):
 
     def loadImageModel_(self, sender):
         """Load a Stable Diffusion model on the selected GPU."""
+        if not _HAS_IMAGE_GEN or self.image_gen is None:
+            self.appendLog_("[IMG ERROR] Image generation module not available (excluded from py2app build).")
+            return
         model_id = self.img_model_field.stringValue()
         if not model_id.strip():
             self.appendLog_("[IMG ERROR] No model ID specified.")
@@ -554,6 +565,9 @@ class AppDelegate(NSObject):
 
     def generateImage_(self, sender):
         """Generate an image from the text prompt."""
+        if not _HAS_IMAGE_GEN or self.image_gen is None:
+            self.appendLog_("[IMG ERROR] Image generation module not available.")
+            return
         if not self.image_gen.is_ready():
             self.appendLog_("[IMG ERROR] No image model loaded. Load a model first.")
             self.img_status_label.setStringValue_("Status: No model loaded")
@@ -611,7 +625,8 @@ class AppDelegate(NSObject):
     def toggleApiService_(self, sender):
         if self.toggle_api_btn.title() == "Start API Service":
             self.appendLog_("[API] Starting API conversion service...")
-            if not self.api_converter.is_ready() and not self.image_gen.is_ready():
+            img_ready = _HAS_IMAGE_GEN and self.image_gen is not None and self.image_gen.is_ready()
+            if not self.api_converter.is_ready() and not img_ready:
                 self.appendLog_("[ERROR] No model loaded for API service. Please load an LLM or image model first.")
                 return
             success = self.api_converter.start_service(port=1234)

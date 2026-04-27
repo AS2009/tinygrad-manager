@@ -25,8 +25,9 @@ class ImageGenerator:
     def load_model(self, model_id: str, device: str = "cpu") -> Tuple[bool, str]:
         with self._lock:
             try:
-                import torch
-                from diffusers import StableDiffusionPipeline
+                torch = __import__('torch')
+                diffusers = __import__('diffusers')
+                StableDiffusionPipeline = diffusers.StableDiffusionPipeline
 
                 self._log(f"[IMG] Loading Stable Diffusion pipeline: {model_id}")
 
@@ -86,7 +87,7 @@ class ImageGenerator:
                 return None, {"error": "No image model loaded. Load a model first."}
 
             try:
-                import torch
+                torch = __import__('torch')
 
                 generator = None
                 if seed is not None:
@@ -154,7 +155,7 @@ class ImageGenerator:
                 self.model_id = None
                 self.device = None
                 try:
-                    import torch
+                    torch = __import__('torch')
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                 except Exception:
