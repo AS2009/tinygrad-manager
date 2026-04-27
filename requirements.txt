@@ -12,5 +12,7 @@ anyio
 starlette
 click
 h11
-gguf
-mlx
+# 可选: GGUF 格式支持 (llama.cpp 模型)
+# gguf
+# 可选: MLX 格式支持 (仅限 Apple Silicon Mac)
+# mlx

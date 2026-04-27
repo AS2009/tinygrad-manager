@@ -1,16 +1,25 @@
 from setuptools import setup
+import importlib.util
 
 APP = ['TinyGradManager/main.py']
 DATA_FILES = []
+
+# 核心依赖包
+_packages = [
+    'tinygrad',
+    'fastapi', 'uvicorn', 'pydantic',
+    'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
+    'urllib3', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
+]
+
+# 可选格式支持包：仅当已安装时才打包
+for _pkg in ['gguf', 'mlx']:
+    if importlib.util.find_spec(_pkg):
+        _packages.append(_pkg)
+
 OPTIONS = {
     'argv_emulation': False,
-    'packages': [
-        'tinygrad',
-        'fastapi', 'uvicorn', 'pydantic',
-        'numpy', 'certifi', 'charset_normalizer', 'idna', 'requests',
-        'urllib3', 'anyio', 'sniffio', 'h11', 'click', 'starlette',
-        'gguf', 'mlx',
-    ],
+    'packages': _packages,
     'includes': [
         'AppKit', 'Foundation', 'objc',
         'pydantic_core', 'pydantic_core._pydantic_core',
