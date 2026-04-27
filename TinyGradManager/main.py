@@ -14,103 +14,265 @@ import objc
 from Foundation import NSObject, NSRunLoop, NSLog
 from AppKit import (
     NSApplication, NSWindow, NSView,
-    NSButton, NSTextField, NSPopUpButton, NSScrollView, NSTextView,
-    NSMakeRect, NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
+    NSButton, NSTextField, NSScrollView, NSTextView, NSImageView,
+    NSVisualEffectView,
+    NSMakeRect,
+    NSWindowStyleMaskTitled, NSWindowStyleMaskClosable,
     NSWindowStyleMaskMiniaturizable, NSWindowStyleMaskResizable,
     NSBackingStoreBuffered,
-    NSOpenPanel, NSModalResponseOK  # ← 这两个必须从 AppKit 导入！
+    NSOpenPanel, NSModalResponseOK,
 )
 from threading import Thread
 
-# 导入自定义模块
 import gpu_manager
 import service_controller
 import api_converter
 import env_checker
 
+# ── Look up classes that may not have direct pyobjc wrappers ──────────────
+NSFont = objc.lookUpClass("NSFont")
+NSColor = objc.lookUpClass("NSColor")
+NSImage = objc.lookUpClass("NSImage")
+NSImageSymbolConfiguration = objc.lookUpClass("NSImageSymbolConfiguration")
+
+# ── Visual effect constants ────────────────────────────────────────────────
+# AppKit enums — using integer values for safety with pyobjc
+_BlendBehindWindow = 1    # NSVisualEffectBlendingModeBehindWindow
+_BlendWithinWindow = 0    # NSVisualEffectBlendingModeWithinWindow
+_MatUnderWindowBg = 12    # NSVisualEffectMaterialUnderWindowBackground (10.14+)
+_MatContentBg = 11        # NSVisualEffectMaterialContentBackground (10.14+)
+_MatHUD = 8               # NSVisualEffectMaterialHUDWindow
+_StateActive = 1          # NSVisualEffectStateActive
+_StateFollowsWindow = 0   # NSVisualEffectStateFollowsWindowActiveState
+
+
+def _sf_symbol(name, size=16.0, weight=0.0):
+    """Load an SF Symbol as NSImage at the given point size and weight."""
+    img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, "")
+    if img is None:
+        return None
+    try:
+        cfg = NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(
+            size, weight, 0  # scale: 0 = medium (system default)
+        )
+        return img.imageWithSymbolConfiguration_(cfg)
+    except Exception:
+        return img
+
+
+def _icon_view(name, x, y, w, h, size=0):
+    """Create an NSImageView preloaded with an SF Symbol."""
+    if size == 0:
+        size = h
+    img = _sf_symbol(name, size)
+    v = NSImageView.alloc().initWithFrame_(NSMakeRect(x, y, w, h))
+    if img:
+        v.setImage_(img)
+    v.setImageScaling_(3)  # proportionally up or down
+    return v
+
+
+def _label(text, x, y, w, h, font_size=13, weight=0.0, color=None):
+    """Create an NSTextField label with system font."""
+    tf = NSTextField.labelWithString_(text)
+    tf.setFrame_(NSMakeRect(x, y, w, h))
+    tf.setFont_(NSFont.systemFontOfSize_weight_(font_size, weight))
+    if color:
+        tf.setTextColor_(color)
+    return tf
+
+
+def _glass_card(x, y, w, h):
+    """Create a glass card: NSVisualEffectView with rounded corners."""
+    card = NSVisualEffectView.alloc().initWithFrame_(NSMakeRect(x, y, w, h))
+    card.setBlendingMode_(_BlendWithinWindow)
+    card.setMaterial_(_MatContentBg)
+    card.setState_(_StateActive)
+    card.setWantsLayer_(True)
+    card.layer().setCornerRadius_(14.0)
+    card.layer().setMasksToBounds_(True)
+    # subtle border
+    card.layer().setBorderWidth_(0.5)
+    card.layer().setBorderColor_(
+        NSColor.separatorColor().colorWithAlphaComponent_(0.4).CGColor()
+    )
+    return card
+
+
+def _pill_button(title, target, action, x, y, w, h, primary=False):
+    """Create a rounded pill-style button."""
+    btn = NSButton.buttonWithTitle_target_action_(title, target, action)
+    btn.setFrame_(NSMakeRect(x, y, w, h))
+    btn.setBezelStyle_(1)  # rounded
+    if primary:
+        btn.setContentTintColor_(NSColor.controlAccentColor())
+    return btn
+
+
 class AppDelegate(NSObject):
+
     def applicationDidFinishLaunching_(self, notification):
-        # 窗口尺寸
-        rect = NSMakeRect(100, 100, 750, 600)
-        mask = (NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
-                NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
+        # ── Window ────────────────────────────────────────────────────────
+        win_w, win_h = 840, 700
+        rect = NSMakeRect(100, 100, win_w, win_h)
+        mask = (
+            NSWindowStyleMaskTitled
+            | NSWindowStyleMaskClosable
+            | NSWindowStyleMaskMiniaturizable
+            | NSWindowStyleMaskResizable
+            | (1 << 15)  # NSWindowStyleMaskFullSizeContentView
+        )
         self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-            rect, mask, NSBackingStoreBuffered, False)
+            rect, mask, NSBackingStoreBuffered, False
+        )
         self.window.setTitle_("TinyGrad Manager")
+        self.window.setTitlebarAppearsTransparent_(True)
+        self.window.setTitleVisibility_(1)  # NSWindowTitleHidden
         self.window.makeKeyAndOrderFront_(None)
 
         content_view = self.window.contentView()
 
-        # 标题
-        title_label = NSTextField.labelWithString_("🚀 TinyGrad Model Manager")
-        title_label.setFrame_(NSMakeRect(20, 530, 710, 40))
-        title_label.setFont_(objc.lookUpClass("NSFont").fontWithName_size_("Helvetica-Bold", 24))
-        content_view.addSubview_(title_label)
+        # ── Full-window glass background ──────────────────────────────────
+        bg = NSVisualEffectView.alloc().initWithFrame_(
+            NSMakeRect(0, 0, win_w, win_h)
+        )
+        bg.setBlendingMode_(_BlendBehindWindow)
+        bg.setMaterial_(_MatUnderWindowBg)
+        bg.setState_(_StateActive)
+        bg.setAutoresizingMask_(2 | 4)  # width | height
+        content_view.addSubview_(bg)
 
-        # ---------- 模型选择区域 ----------
-        model_label = NSTextField.labelWithString_("Select Model File:")
-        model_label.setFrame_(NSMakeRect(20, 470, 150, 25))
-        content_view.addSubview_(model_label)
+        # ── Header ────────────────────────────────────────────────────────
+        header_y = win_h - 64  # 64px from top, clears traffic-light buttons
 
-        # 显示所选文件路径的标签
-        self.model_path_label = NSTextField.labelWithString_("No file selected")
-        self.model_path_label.setFrame_(NSMakeRect(20, 440, 500, 25))
-        content_view.addSubview_(self.model_path_label)
+        icon = _icon_view("shippingbox.fill", 68, header_y, 36, 36, 32)
+        bg.addSubview_(icon)
 
-        # 选择文件按钮
-        select_btn = NSButton.buttonWithTitle_target_action_("Browse...", self, "selectModelFile:")
-        select_btn.setFrame_(NSMakeRect(530, 435, 100, 32))
-        select_btn.setBezelStyle_(1)
-        content_view.addSubview_(select_btn)
+        title_lbl = _label(
+            "TinyGrad Manager", 112, header_y + 4, 500, 32,
+            font_size=26, weight=0.4  # bold
+        )
+        bg.addSubview_(title_lbl)
 
-        # 加载模型按钮
-        load_btn = NSButton.buttonWithTitle_target_action_("Load Model", self, "loadModel:")
-        load_btn.setFrame_(NSMakeRect(640, 435, 90, 32))
-        load_btn.setBezelStyle_(1)
-        content_view.addSubview_(load_btn)
+        sub_lbl = _label(
+            "Model Management & GPU Control", 114, header_y - 16, 500, 16,
+            font_size=11, weight=0.0,
+            color=NSColor.secondaryLabelColor()
+        )
+        bg.addSubview_(sub_lbl)
 
-        # GPU 信息
-        self.gpu_info_label = NSTextField.labelWithString_("🔍 Detecting GPU...")
-        self.gpu_info_label.setFrame_(NSMakeRect(20, 390, 560, 25))
-        content_view.addSubview_(self.gpu_info_label)
+        # ── Card 1: Model ─────────────────────────────────────────────────
+        c1_y, c1_h = 430, 175
+        card1 = _glass_card(24, c1_y, win_w - 48, c1_h)
+        bg.addSubview_(card1)
 
-        # GPU 服务控制
-        self.start_service_btn = NSButton.buttonWithTitle_target_action_("Start GPU Service", self, "toggleService:")
-        self.start_service_btn.setFrame_(NSMakeRect(150, 340, 150, 32))
-        self.start_service_btn.setBezelStyle_(1)
-        content_view.addSubview_(self.start_service_btn)
+        # card header
+        card1.addSubview_(_icon_view("doc.fill", 16, c1_h - 26, 18, 18, 14))
+        card1.addSubview_(_label("Model File", 40, c1_h - 28, 200, 20,
+                                 font_size=13, weight=0.23))
 
-        # API 转换器状态
-        self.api_status_label = NSTextField.labelWithString_("🌐 API Service: Inactive")
-        self.api_status_label.setFrame_(NSMakeRect(20, 290, 250, 25))
-        content_view.addSubview_(self.api_status_label)
+        # file path
+        self.model_path_label = _label(
+            "No file selected", 16, c1_h - 58, 600, 22,
+            font_size=12,
+            color=NSColor.secondaryLabelColor()
+        )
+        card1.addSubview_(self.model_path_label)
 
-        self.toggle_api_btn = NSButton.buttonWithTitle_target_action_("Start API Service", self, "toggleApiService:")
-        self.toggle_api_btn.setFrame_(NSMakeRect(280, 285, 150, 32))
-        self.toggle_api_btn.setBezelStyle_(1)
-        content_view.addSubview_(self.toggle_api_btn)
+        # buttons
+        btn_y = 22
+        c1_w = win_w - 48  # card content width
+        browse_btn = _pill_button(
+            "Browse...", self, "selectModelFile:",
+            c1_w - 240, btn_y, 100, 32
+        )
+        card1.addSubview_(browse_btn)
 
-        # 日志区域
-        scroll_view = NSScrollView.alloc().initWithFrame_(NSMakeRect(20, 20, 710, 250))
+        load_btn = _pill_button(
+            "Load Model", self, "loadModel:",
+            c1_w - 128, btn_y, 106, 32, primary=True
+        )
+        card1.addSubview_(load_btn)
+
+        # ── Card 2: System ────────────────────────────────────────────────
+        c2_y, c2_h = 230, 180
+        card2 = _glass_card(24, c2_y, win_w - 48, c2_h)
+        bg.addSubview_(card2)
+
+        card2.addSubview_(_icon_view("cpu.fill", 16, c2_h - 26, 18, 18, 14))
+        card2.addSubview_(_label("System Status", 40, c2_h - 28, 200, 20,
+                                 font_size=13, weight=0.23))
+
+        # GPU info
+        self.gpu_info_label = _label(
+            "Detecting GPU...", 16, c2_h - 56, 600, 22,
+            font_size=12
+        )
+        card2.addSubview_(self.gpu_info_label)
+
+        # GPU service row
+        card2.addSubview_(_label("GPU Service", 16, c2_h - 94, 120, 22,
+                                 font_size=12, weight=0.23))
+        self.start_service_btn = _pill_button(
+            "Start GPU Service", self, "toggleService:",
+            c1_w - 232, c2_h - 100, 180, 32
+        )
+        card2.addSubview_(self.start_service_btn)
+
+        # API service row
+        self.api_status_label = _label(
+            "API Service: Inactive", 16, c2_h - 138, 250, 22,
+            font_size=12,
+            color=NSColor.secondaryLabelColor()
+        )
+        card2.addSubview_(self.api_status_label)
+
+        self.toggle_api_btn = _pill_button(
+            "Start API Service", self, "toggleApiService:",
+            c1_w - 232, c2_h - 144, 180, 32
+        )
+        card2.addSubview_(self.toggle_api_btn)
+
+        # ── Card 3: Console ───────────────────────────────────────────────
+        c3_y, c3_h = 20, 190
+        card3 = _glass_card(24, c3_y, win_w - 48, c3_h)
+        card3.setMaterial_(_MatHUD)  # darker glass for console
+        bg.addSubview_(card3)
+
+        card3.addSubview_(_icon_view("terminal.fill", 16, c3_h - 26, 18, 18, 14))
+        card3.addSubview_(_label("Console", 40, c3_h - 28, 200, 20,
+                                 font_size=13, weight=0.23))
+
+        # log area
+        scroll_view = NSScrollView.alloc().initWithFrame_(
+            NSMakeRect(12, 10, win_w - 72, c3_h - 50)
+        )
         scroll_view.setHasVerticalScroller_(True)
-        scroll_view.setBorderType_(2)
+        scroll_view.setBorderType_(0)  # no border — card already has one
+        scroll_view.setDrawsBackground_(False)
 
-        self.log_textview = NSTextView.alloc().initWithFrame_(scroll_view.contentView().frame())
+        self.log_textview = NSTextView.alloc().initWithFrame_(
+            scroll_view.contentView().frame()
+        )
         self.log_textview.setEditable_(False)
         self.log_textview.setSelectable_(True)
+        self.log_textview.setBackgroundColor_(NSColor.clearColor())
+        self.log_textview.setFont_(NSFont.monospacedSystemFontOfSize_weight_(11, 0.0))
+        self.log_textview.setTextColor_(NSColor.labelColor())
         scroll_view.setDocumentView_(self.log_textview)
-        content_view.addSubview_(scroll_view)
+        card3.addSubview_(scroll_view)
 
-        # 初始化组件
+        # ── Init ──────────────────────────────────────────────────────────
         self.api_converter = api_converter.ApiConverter()
-        self.loaded_model = None      # 保存加载的模型对象
-        self.model_path = None        # 保存模型文件路径
+        self.loaded_model = None
+        self.model_path = None
 
         self.detectGPU_(None)
         self.checkLocalEnvironment()
 
+    # ── Actions (unchanged logic) ────────────────────────────────────────
+
     def selectModelFile_(self, sender):
-        """打开文件选择对话框，选择模型权重文件"""
         panel = NSOpenPanel.openPanel()
         panel.setCanChooseFiles_(True)
         panel.setCanChooseDirectories_(False)
@@ -123,45 +285,39 @@ class AppDelegate(NSObject):
             url = panel.URLs()[0]
             file_path = url.path()
             self.model_path = file_path
-            self.model_path_label.setStringValue_(f"📁 {os.path.basename(file_path)}")
-            self.appendLog_(f"Selected: {file_path}")
+            self.model_path_label.setStringValue_(os.path.basename(file_path))
+            self.appendLog_(f"[FILE] Selected: {file_path}")
 
     def loadModel_(self, sender):
-        """加载选中的模型文件"""
         if not self.model_path:
-            self.appendLog_("❌ No model file selected.")
+            self.appendLog_("[ERROR] No model file selected.")
             return
 
-        self.appendLog_(f"⏳ Loading model from {self.model_path}...")
+        self.appendLog_(f"[...] Loading model from {self.model_path}...")
         try:
             from tinygrad.nn.state import safe_load, torch_load
             import json
 
-            # 根据扩展名加载权重
             if self.model_path.endswith('.safetensors'):
                 state_dict = safe_load(self.model_path)
                 self.loaded_model = state_dict
-                self.appendLog_(f"✅ Model weights loaded. Keys count: {len(state_dict)}")
+                self.appendLog_(f"[OK] Model weights loaded. Keys count: {len(state_dict)}")
             elif self.model_path.endswith(('.pth', '.pt')):
                 state_dict = torch_load(self.model_path)
                 self.loaded_model = state_dict
-                self.appendLog_(f"✅ Model weights loaded. Keys count: {len(state_dict)}")
+                self.appendLog_(f"[OK] Model weights loaded. Keys count: {len(state_dict)}")
             elif self.model_path.endswith('.json'):
-                # 可能是模型配置
                 with open(self.model_path, 'r') as f:
                     config = json.load(f)
                 self.appendLog_(f"Loaded config: {list(config.keys())}")
-                # 暂存配置，实际使用时需根据配置构建模型
                 self.loaded_model = config
-                self.appendLog_("✅ Config loaded. (Model architecture not yet implemented)")
+                self.appendLog_("[OK] Config loaded. (Model architecture not yet implemented)")
             elif self.model_path.endswith('.gguf'):
-                # 使用 gguf Python 库加载 GGUF 格式模型
                 try:
                     import gguf
                     reader = gguf.GGUFReader(self.model_path)
-                    self.appendLog_(f"✅ GGUF model loaded. Tensors count: {len(reader.tensors)}")
+                    self.appendLog_(f"[OK] GGUF model loaded. Tensors count: {len(reader.tensors)}")
                     self.appendLog_(f"   Model architecture: {reader.fields.get('general.architecture', None)}")
-                    # 暴露字段信息以便后续推理使用
                     self.loaded_model = {
                         "format": "gguf",
                         "path": self.model_path,
@@ -169,14 +325,11 @@ class AppDelegate(NSObject):
                         "tensor_count": len(reader.tensors),
                     }
                 except ImportError:
-                    self.appendLog_("⚠️ 'gguf' package not found. Install with: pip install gguf")
+                    self.appendLog_("[WARN] 'gguf' package not found. Install with: pip install gguf")
                     return
             elif self.model_path.endswith('.mlx'):
-                # 使用 mlx 库加载 MLX 格式模型（.safetensors 通常与 MLX 搭配，.mlx 扩展名也是常见约定）
                 try:
                     import mlx.core as mx
-                    # MLX 模型通常是一个包含 .safetensors 权重文件的目录，
-                    # 或使用 mlx-lm 加载完整的 MLX 模型
                     weights = mx.load(self.model_path)
                     self.loaded_model = {
                         "format": "mlx",
@@ -184,27 +337,26 @@ class AppDelegate(NSObject):
                         "weights": weights,
                         "tensor_count": len(weights),
                     }
-                    self.appendLog_(f"✅ MLX model loaded. Weights count: {len(weights)}")
+                    self.appendLog_(f"[OK] MLX model loaded. Weights count: {len(weights)}")
                 except ImportError:
-                    self.appendLog_("⚠️ 'mlx' package not found. Install with: pip install mlx")
+                    self.appendLog_("[WARN] 'mlx' package not found. Install with: pip install mlx")
                     return
             else:
-                self.appendLog_(f"❌ Unsupported file type: {self.model_path}")
+                self.appendLog_(f"[ERROR] Unsupported file type: {self.model_path}")
                 return
 
-            # 将模型传递给 API 转换器
             self.api_converter.set_model(self.loaded_model, os.path.basename(self.model_path))
-            self.appendLog_("✅ Model transferred to API converter.")
+            self.appendLog_("[OK] Model transferred to API converter.")
 
         except Exception as e:
             import traceback
-            self.appendLog_(f"❌ Failed to load model: {str(e)}")
+            self.appendLog_(f"[ERROR] Failed to load model: {str(e)}")
             self.appendLog_(f"   {traceback.format_exc()}")
 
     def detectGPU_(self, sender):
         gpu_info = gpu_manager.get_gpu_info()
-        self.gpu_info_label.setStringValue_(f"💻 GPU Info: {gpu_info}")
-        self.appendLog_(f"GPU detected: {gpu_info}")
+        self.gpu_info_label.setStringValue_(f"GPU: {gpu_info}")
+        self.appendLog_(f"[GPU] Detected: {gpu_info}")
 
     def checkLocalEnvironment(self):
         env_info = env_checker.check_environment()
@@ -213,38 +365,38 @@ class AppDelegate(NSObject):
 
     def toggleService_(self, sender):
         if self.start_service_btn.title() == "Start GPU Service":
-            self.appendLog_("⚙️ Starting GPU service...")
+            self.appendLog_("[SERVICE] Starting GPU service...")
             success = service_controller.start_service()
             if success:
                 self.start_service_btn.setTitle_("Stop GPU Service")
-                self.appendLog_("✅ GPU service started (tinygrad runtime initialized).")
+                self.appendLog_("[OK] GPU service started (tinygrad runtime initialized).")
             else:
-                self.appendLog_("❌ Failed to start GPU service.")
+                self.appendLog_("[ERROR] Failed to start GPU service.")
         else:
-            self.appendLog_("🛑 Stopping GPU service...")
+            self.appendLog_("[STOP] Stopping GPU service...")
             success = service_controller.stop_service()
             if success:
                 self.start_service_btn.setTitle_("Start GPU Service")
-                self.appendLog_("✅ GPU service stopped.")
+                self.appendLog_("[OK] GPU service stopped.")
             else:
-                self.appendLog_("❌ Failed to stop GPU service.")
+                self.appendLog_("[ERROR] Failed to stop GPU service.")
 
     def toggleApiService_(self, sender):
         if self.toggle_api_btn.title() == "Start API Service":
-            self.appendLog_("🌐 Starting API conversion service...")
+            self.appendLog_("[API] Starting API conversion service...")
             if not self.api_converter.is_ready():
-                self.appendLog_("❌ No model loaded for API service. Please load a model first.")
+                self.appendLog_("[ERROR] No model loaded for API service. Please load a model first.")
                 return
             self.api_converter.start_service(port=1234)
             self.toggle_api_btn.setTitle_("Stop API Service")
-            self.api_status_label.setStringValue_("🌐 API Service: Active (Port 1234)")
-            self.appendLog_("✅ API service started on http://localhost:1234")
+            self.api_status_label.setStringValue_("API Service: Active (Port 1234)")
+            self.appendLog_("[OK] API service started on http://localhost:1234")
         else:
-            self.appendLog_("🛑 Stopping API service...")
+            self.appendLog_("[STOP] Stopping API service...")
             self.api_converter.stop_service()
             self.toggle_api_btn.setTitle_("Start API Service")
-            self.api_status_label.setStringValue_("🌐 API Service: Inactive")
-            self.appendLog_("✅ API service stopped.")
+            self.api_status_label.setStringValue_("API Service: Inactive")
+            self.appendLog_("[OK] API service stopped.")
 
     def appendLog_(self, message):
         current_text = self.log_textview.string()
@@ -252,6 +404,7 @@ class AppDelegate(NSObject):
         self.log_textview.setString_(new_text)
         self.log_textview.scrollToEndOfDocument_(self)
         NSLog(message)
+
 
 if __name__ == "__main__":
     app = NSApplication.sharedApplication()

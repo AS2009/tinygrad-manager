@@ -34,7 +34,7 @@ OPTIONS = {
         'CFBundleShortVersionString': '1.0.0',
         'NSHumanReadableCopyright': 'Copyright © 2025',
         'NSHighResolutionCapable': True,
-        'LSMinimumSystemVersion': '10.13',
+        'LSMinimumSystemVersion': '12.0',
     },
     'site_packages': True,
 }
