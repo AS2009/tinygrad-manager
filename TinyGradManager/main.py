@@ -254,7 +254,7 @@ class AppDelegate(NSObject):
         card1.addSubview_(load_btn)
 
         # ── Card 2: Text-to-Image ──────────────────────────────────────────
-        c2_y, c2_h = 470, 200
+        c2_y, c2_h = 440, 230
         card_img = _glass_card(24, c2_y, win_w - 48, c2_h)
         bg.addSubview_(card_img)
 
@@ -277,30 +277,45 @@ class AppDelegate(NSObject):
             self.img_gpu_popup = None
             self.appendLog_("[WARN] Could not create image GPU selector popup.")
 
-        # Model ID field
-        card_img.addSubview_(_label("Model ID:", 290, c2_h - 56, 60, 22,
+        # Model File picker (local file, like DrawThings)
+        card_img.addSubview_(_label("Model File:", 16, c2_h - 106, 75, 22,
+                                    font_size=11, color=NSColor.secondaryLabelColor()))
+        browse_img_btn = _pill_button(
+            "Browse...", self, "selectImageModelFile:",
+            90, c2_h - 110, 100, 28
+        )
+        card_img.addSubview_(browse_img_btn)
+
+        self.img_model_path_label = _label(
+            "No local file selected", 200, c2_h - 106, c1_w - 220, 22,
+            font_size=11,
+            color=NSColor.secondaryLabelColor()
+        )
+        card_img.addSubview_(self.img_model_path_label)
+
+        # HuggingFace Model ID (fallback)
+        card_img.addSubview_(_label("Or HuggingFace ID:", 16, c2_h - 140, 130, 22,
                                     font_size=11, color=NSColor.secondaryLabelColor()))
         self.img_model_field = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(290, c2_h - 80, 320, 26)
+            NSMakeRect(150, c2_h - 144, 260, 26)
         )
         self.img_model_field.setStringValue_("runwayml/stable-diffusion-v1-5")
         self.img_model_field.setFont_(NSFont.systemFontOfSize_weight_(11, 0.0))
         self.img_model_field.setBezeled_(True)
-        self.img_model_field.setBezelStyle_(1)  # square bezel
+        self.img_model_field.setBezelStyle_(1)
         card_img.addSubview_(self.img_model_field)
 
-        # Load Image Model button
         load_img_btn = _pill_button(
             "Load Image Model", self, "loadImageModel:",
-            c1_w - 160, c2_h - 82, 146, 32, primary=True
+            c1_w - 160, c2_h - 146, 146, 32, primary=True
         )
         card_img.addSubview_(load_img_btn)
 
         # Prompt field
-        card_img.addSubview_(_label("Prompt:", 16, c2_h - 116, 60, 22,
+        card_img.addSubview_(_label("Prompt:", 16, c2_h - 178, 60, 22,
                                     font_size=11, color=NSColor.secondaryLabelColor()))
         self.img_prompt_field = NSTextField.alloc().initWithFrame_(
-            NSMakeRect(16, c2_h - 140, c1_w - 180, 26)
+            NSMakeRect(16, c2_h - 202, c1_w - 180, 26)
         )
         self.img_prompt_field.setStringValue_("a cat sitting on a cloud, digital art")
         self.img_prompt_field.setFont_(NSFont.systemFontOfSize_weight_(11, 0.0))
@@ -308,16 +323,15 @@ class AppDelegate(NSObject):
         self.img_prompt_field.setBezelStyle_(1)
         card_img.addSubview_(self.img_prompt_field)
 
-        # Generate button
         gen_btn = _pill_button(
             "Generate Image", self, "generateImage:",
-            c1_w - 148, c2_h - 142, 134, 32, primary=True
+            c1_w - 148, c2_h - 204, 134, 32, primary=True
         )
         card_img.addSubview_(gen_btn)
 
         # Status label
         self.img_status_label = _label(
-            "Status: No model loaded", 16, c2_h - 170, c1_w - 40, 22,
+            "Status: No model loaded", 16, c2_h - 230, c1_w - 40, 22,
             font_size=11,
             color=NSColor.secondaryLabelColor()
         )
@@ -363,7 +377,7 @@ class AppDelegate(NSObject):
         card3.addSubview_(self.toggle_api_btn)
 
         # ── Card 4: Console ───────────────────────────────────────────────
-        c4_y, c4_h = 20, 230
+        c4_y, c4_h = 20, 220
         card4 = _glass_card(24, c4_y, win_w - 48, c4_h)
         card4.setMaterial_(_MatHUD)  # darker glass for console
         bg.addSubview_(card4)
@@ -407,6 +421,7 @@ class AppDelegate(NSObject):
             self.image_gen = None
         self.loaded_model = None
         self.model_path = None
+        self.img_model_path = None
 
         self.detectGPU_(None)
         self.checkLocalEnvironment()
@@ -418,7 +433,7 @@ class AppDelegate(NSObject):
 
     def applicationShouldTerminate_(self, app):
         """Allow termination without prompt."""
-        return 0  # NSTerminateNow
+        return 1  # NSTerminateNow (0 = NSTerminateCancel)
 
     def windowShouldClose_(self, notification):
         """Close button hides to menu bar instead of quitting."""
@@ -541,10 +556,17 @@ class AppDelegate(NSObject):
         if not _HAS_IMAGE_GEN or self.image_gen is None:
             self.appendLog_("[IMG ERROR] Image generation module not available (excluded from py2app build).")
             return
-        model_id = self.img_model_field.stringValue()
-        if not model_id.strip():
-            self.appendLog_("[IMG ERROR] No model ID specified.")
-            return
+
+        # Prefer local file path over HuggingFace model ID
+        if self.img_model_path and os.path.isfile(self.img_model_path):
+            model_id = self.img_model_path
+        elif self.img_model_path and os.path.isdir(self.img_model_path):
+            model_id = self.img_model_path
+        else:
+            model_id = self.img_model_field.stringValue().strip()
+            if not model_id:
+                self.appendLog_("[IMG ERROR] No model specified. Browse a local file or enter a HuggingFace ID.")
+                return
 
         selected_device = self.img_gpu_popup.titleOfSelectedItem() if self.img_gpu_popup else None
         device_key = env_checker.parse_gpu_device_key(selected_device or "cpu")
@@ -593,6 +615,23 @@ class AppDelegate(NSObject):
         import threading
         t = threading.Thread(target=_gen, daemon=True)
         t.start()
+
+    def selectImageModelFile_(self, sender):
+        """Open file picker for local Stable Diffusion model (safetensors, ckpt, etc.)."""
+        panel = NSOpenPanel.openPanel()
+        panel.setCanChooseFiles_(True)
+        panel.setCanChooseDirectories_(True)
+        panel.setAllowsMultipleSelection_(False)
+        panel.setTitle_("Select Image Model")
+        panel.setMessage_("Choose a Stable Diffusion checkpoint (.safetensors, .ckpt, .pt, .bin) or model directory.")
+        panel.setAllowedFileTypes_(["safetensors", "ckpt", "pt", "pth", "bin"])
+
+        if panel.runModal() == NSModalResponseOK:
+            url = panel.URLs()[0]
+            file_path = url.path()
+            self.img_model_path = file_path
+            self.img_model_path_label.setStringValue_(os.path.basename(file_path))
+            self.appendLog_(f"[IMG FILE] Selected: {file_path}")
 
     def detectGPU_(self, sender):
         gpu_info = gpu_manager.get_gpu_info()

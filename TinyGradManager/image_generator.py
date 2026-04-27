@@ -35,12 +35,35 @@ class ImageGenerator:
                 if device.startswith("cuda"):
                     dtype = torch.float16
 
-                pipe = StableDiffusionPipeline.from_pretrained(
-                    model_id,
-                    torch_dtype=dtype,
-                    safety_checker=None,
-                    requires_safety_checker=False,
-                )
+                # Detect source type: local single file, local directory, or HuggingFace ID
+                is_local_file = os.path.isfile(model_id)
+                is_local_dir = os.path.isdir(model_id)
+                single_file_exts = ('.safetensors', '.ckpt', '.pt', '.pth', '.bin')
+
+                if is_local_file and model_id.lower().endswith(single_file_exts):
+                    self._log(f"[IMG] Loading from single checkpoint file: {os.path.basename(model_id)}")
+                    pipe = StableDiffusionPipeline.from_single_file(
+                        model_id,
+                        torch_dtype=dtype,
+                        safety_checker=None,
+                        requires_safety_checker=False,
+                    )
+                elif is_local_dir:
+                    self._log(f"[IMG] Loading from local directory: {model_id}")
+                    pipe = StableDiffusionPipeline.from_pretrained(
+                        model_id,
+                        torch_dtype=dtype,
+                        safety_checker=None,
+                        requires_safety_checker=False,
+                    )
+                else:
+                    self._log(f"[IMG] Loading from HuggingFace: {model_id}")
+                    pipe = StableDiffusionPipeline.from_pretrained(
+                        model_id,
+                        torch_dtype=dtype,
+                        safety_checker=None,
+                        requires_safety_checker=False,
+                    )
 
                 if device.startswith("cuda") and torch.cuda.is_available():
                     pipe = pipe.to(device)
