@@ -14,7 +14,6 @@ import json
 import time
 import signal
 import argparse
-import asyncio
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -104,7 +103,8 @@ def _load_llm_model(file_path: str, device_key: str = "cpu") -> dict:
 
 def create_app():
     if not _HAS_API_DEPS:
-        raise RuntimeError("API dependencies missing. Install: pip install fastapi uvicorn pydantic")
+        _log("FATAL: API dependencies missing. pip install fastapi uvicorn pydantic")
+        sys.exit(1)
 
     global api_converter, image_gen
 
@@ -167,8 +167,7 @@ def create_app():
     async def load_image_model(req: LoadImageModelReq):
         if not _HAS_IMAGE_GEN or image_gen is None:
             raise HTTPException(503, "Image generation not available")
-        loop = asyncio.get_running_loop()
-        ok, msg = await loop.run_in_executor(None, image_gen.load_model, req.model_source, req.device)
+        ok, msg = image_gen.load_model(req.model_source, req.device)
         if not ok:
             raise HTTPException(500, msg)
         return {"success": True, "message": msg}
@@ -178,13 +177,11 @@ def create_app():
     async def generate_image(req: GenImageReq):
         if not _HAS_IMAGE_GEN or image_gen is None or not image_gen.is_ready():
             raise HTTPException(503, "No image model loaded")
-        loop = asyncio.get_running_loop()
-        img, meta = await loop.run_in_executor(
-            None, image_gen.generate,
-            req.prompt, req.negative_prompt,
-            req.width, req.height,
-            req.steps, req.cfg_scale,
-            req.seed,
+        img, meta = image_gen.generate(
+            prompt=req.prompt, negative_prompt=req.negative_prompt,
+            width=req.width, height=req.height,
+            num_inference_steps=req.steps, guidance_scale=req.cfg_scale,
+            seed=req.seed,
         )
         if img is None:
             raise HTTPException(500, meta.get("error", "Generation failed"))

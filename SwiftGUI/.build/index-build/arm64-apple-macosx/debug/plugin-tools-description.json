@@ -24,11 +24,11 @@
       "inputs" : [
         {
           "kind" : "file",
-          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift"
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/AppMain.swift"
         },
         {
           "kind" : "file",
-          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/main.swift"
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift"
         },
         {
           "kind" : "file",
@@ -43,8 +43,8 @@
       "moduleName" : "TinyGradManager",
       "moduleOutputPath" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/Modules/TinyGradManager.swiftmodule",
       "objects" : [
-        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendClient.swift.o",
-        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/main.swift.o"
+        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/AppMain.swift.o",
+        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendClient.swift.o"
       ],
       "otherArguments" : [
         "-target",
@@ -112,8 +112,8 @@
       ],
       "prepareForIndexing" : true,
       "sources" : [
-        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift",
-        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/main.swift"
+        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/AppMain.swift",
+        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift"
       ],
       "tempsPath" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build",
       "wholeModuleOptimization" : false
@@ -130,8 +130,8 @@
       "-package-name",
       "swiftgui",
       "-c",
+      "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/AppMain.swift",
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift",
-      "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/main.swift",
       "-I",
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/Modules",
       "-target",
@@ -219,11 +219,11 @@
         },
         {
           "kind" : "file",
-          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift"
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/AppMain.swift"
         },
         {
           "kind" : "file",
-          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/main.swift"
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift"
         }
       ],
       "outputFilePath" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/sources"

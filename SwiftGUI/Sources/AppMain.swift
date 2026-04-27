@@ -14,7 +14,7 @@ struct TinyGradManagerApp: App {
 
 // MARK: - App Controller (Menu Bar + Window)
 
-final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
+final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate, ObservableObject {
     private var statusItem: NSStatusItem!
     private var window: NSWindow!
 
@@ -72,7 +72,7 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         return .terminateNow
     }
 
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
+    @objc func windowShouldClose(_ sender: NSWindow) -> Bool {
         window.orderOut(nil)
         return false
     }
@@ -456,7 +456,7 @@ struct ConsoleCard: View {
                 .background(.black.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .onAppear { scrollProxy = proxy }
-                .onChange(of: backend.logs.count) { _ in
+                .onChange(of: backend.logs.count) {
                     withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }
