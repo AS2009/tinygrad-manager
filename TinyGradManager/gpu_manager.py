@@ -20,12 +20,12 @@ def get_gpu_status(gpu_id):
     return run_command(f"SafeEjectGPU gpuid {gpu_id} status")
 
 def set_app_egpu_preference(app_path):
-    """设置应用的 eGPU 偏好（macOS 系统偏好）"""
-    # 使用 macOS 内置的 eGPU 偏好设置机制
-    # set-eGPU.sh 是第三方工具，不一定存在，改为使用系统方法
-    output = run_command(f"SafeEjectGPU gpus")
-    if "Error:" not in output:
-        print(f"eGPU detected. To assign '{app_path}' to eGPU, use: System Preferences > GPU")
+    """Check for eGPU presence and report status."""
+    output = run_command("SafeEjectGPU gpus")
+    if "Error:" not in output and output:
+        print(f"eGPU detected: {output}")
+        print(f"To assign '{app_path}' to eGPU, use: System Preferences > GPU")
+        return True
     else:
-        print(f"No eGPU detected. eGPU preference set attempted for: {app_path}")
-    print(f"eGPU preference set for: {app_path}")
+        print(f"No eGPU detected for: {app_path}")
+        return False

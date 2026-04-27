@@ -146,7 +146,8 @@ class ApiConverter:
             created = int(time.time())
             data = []
 
-            for _ in range(min(request.n or 1, 1)):
+            n = max(1, min(request.n or 1, 4))  # OpenAI-compatible: 1–4
+            for _ in range(n):
                 if request.response_format == "b64_json":
                     buf = io.BytesIO()
                     image.save(buf, format="PNG")

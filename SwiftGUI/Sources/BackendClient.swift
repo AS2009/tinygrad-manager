@@ -26,11 +26,18 @@ struct EnvInfo: Codable {
 }
 
 struct EnvDetails: Codable {
-    let tinygrad: [String: String]?
+    let tinygrad: TinyGradInfo?
     let metal: Bool
     let cuda: Bool
     let platform: String
     let python_version: String
+}
+
+struct TinyGradInfo: Codable {
+    let installed: Bool?
+    let version: String?
+    let default_device: String?
+    let error: String?
 }
 
 struct LogResponse: Codable {

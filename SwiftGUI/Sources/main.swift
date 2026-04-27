@@ -236,6 +236,10 @@ struct ModelCard: View {
                 .labelsHidden()
                 Spacer()
                 PillButton("Load Model", primary: true) {
+                    guard !modelFile.isEmpty else {
+                        loadResult = "Error: no file selected"
+                        return
+                    }
                     Task { loadResult = await backend.loadLLMModel(filePath: modelFile, device: keyFor(selectedDevice)) }
                 }
             }
@@ -253,13 +257,7 @@ struct ModelCard: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.init(filenameExtension: "safetensors")!,
-                                      .init(filenameExtension: "pth")!,
-                                      .init(filenameExtension: "pt")!,
-                                      .init(filenameExtension: "gguf")!,
-                                      .init(filenameExtension: "mlx")!,
-                                      .init(filenameExtension: "json")!,
-                                      .init(filenameExtension: "bin")!]
+        panel.allowedContentTypes = []  // allow all file types (non-standard extensions like safetensors/gguf/mlx)
         if panel.runModal() == .OK, let url = panel.url {
             modelFile = url.path
         }
@@ -359,11 +357,7 @@ struct ImageGenCard: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.init(filenameExtension: "safetensors")!,
-                                      .init(filenameExtension: "ckpt")!,
-                                      .init(filenameExtension: "pt")!,
-                                      .init(filenameExtension: "pth")!,
-                                      .init(filenameExtension: "bin")!]
+        panel.allowedContentTypes = []  // allow all files (non-standard extensions like safetensors/ckpt)
         if panel.runModal() == .OK, let url = panel.url {
             modelSource = url.path
         }

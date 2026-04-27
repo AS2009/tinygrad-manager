@@ -397,6 +397,7 @@ class AppDelegate(NSObject):
         self.log_textview = NSTextView.alloc().initWithFrame_(
             scroll_view.contentView().frame()
         )
+        self.log_textview.setAutoresizingMask_(2)  # NSViewWidthSizable
         self.log_textview.setEditable_(False)
         self.log_textview.setSelectable_(True)
         self.log_textview.setBackgroundColor_(NSColor.clearColor())
@@ -476,18 +477,19 @@ class AppDelegate(NSObject):
             return
 
         # Set GPU device for LLM
-        selected_device = self.llm_gpu_popup.titleOfSelectedItem() if self.llm_gpu_popup else None
+        selected_device = self.llm_gpu_popup.titleOfSelectedItem() if self.llm_gpu_popup else "cpu"
         if selected_device:
             device_key = env_checker.parse_gpu_device_key(selected_device)
             self.appendLog_(f"[GPU] Setting LLM device to: {device_key}")
             try:
                 from tinygrad import Device
-                Device.DEFAULT = device_key.upper()
                 if device_key.startswith("cuda"):
                     cuda_idx = device_key.split(":")[-1]
                     Device.DEFAULT = f"CUDA:{cuda_idx}"
                 elif device_key == "mps":
                     Device.DEFAULT = "METAL"
+                else:
+                    Device.DEFAULT = device_key.upper()
             except Exception as e:
                 self.appendLog_(f"[WARN] Could not set tinygrad device: {e}")
 
@@ -576,9 +578,13 @@ class AppDelegate(NSObject):
         def _load():
             success, msg = self.image_gen.load_model(model_id, device_key)
             if success:
-                self.img_status_label.setStringValue_(f"Status: Ready ({model_id})")
+                self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                    "setImgStatus:", f"Status: Ready ({model_id})", False
+                )
             else:
-                self.img_status_label.setStringValue_(f"Status: Load failed")
+                self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                    "setImgStatus:", "Status: Load failed", False
+                )
             self.appendLog_(f"[IMG] {msg}")
 
         import threading
@@ -606,11 +612,13 @@ class AppDelegate(NSObject):
         def _gen():
             image, meta = self.image_gen.generate(prompt=prompt)
             if image is not None:
-                self.img_status_label.setStringValue_(
-                    f"Status: Done in {meta['elapsed_seconds']}s → {meta['filename']}"
+                self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                    "setImgStatus:", f"Done in {meta['elapsed_seconds']}s -> {meta['filename']}", False
                 )
             else:
-                self.img_status_label.setStringValue_(f"Status: Error - {meta.get('error', 'unknown')}")
+                self.performSelectorOnMainThread_withObject_waitUntilDone_(
+                    "setImgStatus:", f"Error - {meta.get('error', 'unknown')}", False
+                )
 
         import threading
         t = threading.Thread(target=_gen, daemon=True)
@@ -684,6 +692,10 @@ class AppDelegate(NSObject):
                 self.appendLog_("[OK] API service stopped.")
             else:
                 self.appendLog_("[WARN] API service stop skipped (deps not installed).")
+
+    def setImgStatus_(self, text):
+        """Update image status label — must be called from main thread."""
+        self.img_status_label.setStringValue_(f"Status: {text}")
 
     def appendLog_(self, message):
         if not NSThread.isMainThread():
