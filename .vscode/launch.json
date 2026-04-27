@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:tinygrad-manager-1}/SwiftGUI",
+            "name": "Debug TinyGradManager (SwiftGUI)",
+            "target": "TinyGradManager",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug TinyGradManager (SwiftGUI)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:tinygrad-manager-1}/SwiftGUI",
+            "name": "Release TinyGradManager (SwiftGUI)",
+            "target": "TinyGradManager",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release TinyGradManager (SwiftGUI)"
+        }
+    ]
+}

@@ -1,7 +1,4 @@
 tinygrad
-pyobjc
-pyobjc-framework-Cocoa
-pyobjc-framework-Quartz
 fastapi
 uvicorn
 pydantic
@@ -16,10 +13,10 @@ h11
 # gguf
 # 可选: MLX 格式支持 (仅限 Apple Silicon Mac)
 # mlx
-# 文生图 (Stable Diffusion)
-diffusers
-transformers
-accelerate
-safetensors
-torch
-Pillow
+# 文生图 (Stable Diffusion) — 可选，需独立安装
+# diffusers
+# transformers
+# accelerate
+# safetensors
+# torch
+# Pillow
