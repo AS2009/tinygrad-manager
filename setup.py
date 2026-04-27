@@ -21,7 +21,7 @@ OPTIONS = {
     'argv_emulation': False,
     'packages': _packages,
     'includes': [
-        'AppKit', 'Foundation', 'objc',
+        'AppKit', 'Foundation', 'objc', 'Quartz',
         'pydantic_core', 'pydantic_core._pydantic_core',
         'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer',
     ],

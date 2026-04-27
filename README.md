@@ -27,8 +27,8 @@ macOS 桌面应用程序，用于管理 [TinyGrad](https://github.com/tinygrad/t
 
 ## 系统要求
 
-- **操作系统**：macOS 10.13+
-- **Python**：3.10 或 3.11
+- **操作系统**：macOS 12.0+
+- **Python**：3.10+
 - **依赖**：详见 [requirements.txt](requirements.txt)
 
 ## 快速开始

@@ -43,21 +43,28 @@ _MatUnderWindowBg = 12    # NSVisualEffectMaterialUnderWindowBackground (10.14+)
 _MatContentBg = 11        # NSVisualEffectMaterialContentBackground (10.14+)
 _MatHUD = 8               # NSVisualEffectMaterialHUDWindow
 _StateActive = 1          # NSVisualEffectStateActive
-_StateFollowsWindow = 0   # NSVisualEffectStateFollowsWindowActiveState
 
 
 def _sf_symbol(name, size=16.0, weight=0.0):
     """Load an SF Symbol as NSImage at the given point size and weight."""
-    img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, "")
+    try:
+        img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, "")
+    except Exception:
+        return None
     if img is None:
         return None
     try:
         cfg = NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(
-            size, weight, 0  # scale: 0 = medium (system default)
+            size, weight, 1  # scale: 1 = medium
         )
-        return img.imageWithSymbolConfiguration_(cfg)
+        configured = img.imageWithSymbolConfiguration_(cfg)
+        if configured is not None:
+            return configured
     except Exception:
-        return img
+        pass
+    # Fallback: resize the image view instead
+    img.setSize_((size, size))
+    return img
 
 
 def _icon_view(name, x, y, w, h, size=0):
@@ -91,11 +98,12 @@ def _glass_card(x, y, w, h):
     card.setWantsLayer_(True)
     card.layer().setCornerRadius_(14.0)
     card.layer().setMasksToBounds_(True)
-    # subtle border
-    card.layer().setBorderWidth_(0.5)
-    card.layer().setBorderColor_(
-        NSColor.separatorColor().colorWithAlphaComponent_(0.4).CGColor()
-    )
+    try:
+        card.layer().setBorderWidth_(0.5)
+        sep = NSColor.separatorColor().colorWithAlphaComponent_(0.4)
+        card.layer().setBorderColor_(sep.CGColor())
+    except Exception:
+        pass  # border is cosmetic; non-critical if it fails
     return card
 
 
@@ -105,7 +113,10 @@ def _pill_button(title, target, action, x, y, w, h, primary=False):
     btn.setFrame_(NSMakeRect(x, y, w, h))
     btn.setBezelStyle_(1)  # rounded
     if primary:
-        btn.setContentTintColor_(NSColor.controlAccentColor())
+        try:
+            btn.setContentTintColor_(NSColor.controlAccentColor())
+        except Exception:
+            pass  # fallback: use default button appearance
     return btn
 
 
@@ -257,7 +268,13 @@ class AppDelegate(NSObject):
         self.log_textview.setEditable_(False)
         self.log_textview.setSelectable_(True)
         self.log_textview.setBackgroundColor_(NSColor.clearColor())
-        self.log_textview.setFont_(NSFont.monospacedSystemFontOfSize_weight_(11, 0.0))
+        try:
+            mono_font = NSFont.monospacedSystemFontOfSize_weight_(11, 0.0)
+        except Exception:
+            mono_font = NSFont.fontWithName_size_("Menlo", 11)
+            if mono_font is None:
+                mono_font = NSFont.systemFontOfSize_weight_(11, 0.0)
+        self.log_textview.setFont_(mono_font)
         self.log_textview.setTextColor_(NSColor.labelColor())
         scroll_view.setDocumentView_(self.log_textview)
         card3.addSubview_(scroll_view)
