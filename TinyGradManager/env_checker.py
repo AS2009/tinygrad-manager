@@ -157,6 +157,7 @@ def get_available_gpu_devices() -> List[str]:
     Priority: CUDA devices first, then MPS (Apple Silicon), then CPU.
     """
     devices = []
+    has_mps = False
 
     # Check for CUDA GPUs via PyTorch
     try:
@@ -168,11 +169,12 @@ def get_available_gpu_devices() -> List[str]:
     except Exception:
         pass
 
-    # Check for MPS (Apple Silicon)
+    # Check for MPS (Apple Silicon) via PyTorch
     try:
         import torch
         if torch.backends.mps.is_available():
             devices.append("mps (Apple Silicon GPU)")
+            has_mps = True
     except Exception:
         pass
 
@@ -183,7 +185,6 @@ def get_available_gpu_devices() -> List[str]:
         for d in tg_devices:
             d_upper = d.upper()
             if "CUDA" in d_upper and not any(dev.startswith("cuda:") for dev in devices):
-                # Try torch for CUDA count
                 try:
                     import torch
                     cuda_count = torch.cuda.device_count()
@@ -194,11 +195,19 @@ def get_available_gpu_devices() -> List[str]:
                             devices.append(dev_str)
                 except Exception:
                     devices.append(d)
-            elif "METAL" in d_upper or "GPU" in d_upper or "ANE" in d_upper:
-                if "mps" not in str(devices).lower():
+            elif _is_apple_gpu_device(d_upper):
+                if not has_mps and "mps" not in str(devices).lower():
                     devices.append("mps (Apple Silicon GPU)")
+                    has_mps = True
     except Exception:
         pass
+
+    # Fallback: system-level Metal check on macOS (covers built-in GPU)
+    if not has_mps and sys.platform == "darwin" and "mps" not in str(devices).lower():
+        metal_info = check_metal()
+        if metal_info.get("available"):
+            devices.append("mps (Apple Silicon GPU)")
+            has_mps = True
 
     # Fallback: CPU always available
     devices.append("cpu")
@@ -212,14 +221,86 @@ def get_available_gpu_devices() -> List[str]:
             unique.append(d)
     return unique
 
+
+def _is_apple_gpu_device(device_name_upper: str) -> bool:
+    """Check if a tinygrad device name represents an Apple GPU (Metal/ANE)."""
+    apple_devices = {"METAL", "GPU", "ANE"}
+    # Exact match for short names like "METAL", "GPU", "ANE"
+    if device_name_upper in apple_devices:
+        return True
+    # Prefix match for names like "METAL:0", "METAL:1", "ANE:0"
+    for prefix in apple_devices:
+        if device_name_upper.startswith(prefix + ":") or device_name_upper.startswith(prefix + "|"):
+            return True
+    return False
+
 def parse_gpu_device_key(device_str: str) -> str:
-    """Extract the device key (e.g. 'cuda:0', 'mps', 'cpu') from a display string."""
-    if device_str.startswith("cuda:"):
-        # "cuda:0 (NVIDIA GeForce RTX 3080)" -> "cuda:0"
-        return device_str.split(" (")[0]
-    if device_str.startswith("mps"):
+    """Extract the device key (e.g. 'cuda:0', 'mps', 'cpu') from a display string.
+
+    Handles display strings like "cuda:0 (NVIDIA ...)", "mps (Apple Silicon GPU)",
+    and raw tinygrad device names like "METAL", "GPU", "ANE", "CUDA".
+    """
+    if not device_str:
+        return "cpu"
+    d = device_str.strip()
+    d_upper = d.upper()
+
+    # "cuda:0 (NVIDIA GeForce RTX 3080)" -> "cuda:0"
+    if d.startswith("cuda:") or d_upper.startswith("CUDA"):
+        if " (" in d:
+            return d.split(" (")[0].lower()
+        return d.lower()
+
+    # "mps (Apple Silicon GPU)" -> "mps"
+    if d.lower().startswith("mps"):
         return "mps"
+
+    # Raw tinygrad device names: METAL, GPU, ANE -> mps
+    if d_upper in ("METAL", "GPU", "ANE"):
+        return "mps"
+    # METAL:0, GPU:0, ANE:0, etc.
+    for prefix in ("METAL:", "GPU:", "ANE:"):
+        if d_upper.startswith(prefix):
+            return "mps"
+
+    # CLANG, LLVM, CPU -> cpu
+    if d_upper in ("CLANG", "LLVM", "CPU") or d_upper.startswith(("CLANG:", "LLVM:", "CPU:")):
+        return "cpu"
+
     return "cpu"
+
+def set_tinygrad_device(device_key: str) -> str:
+    """Set tinygrad's device based on a parsed device key.
+
+    Uses the new DEV.value API (tinygrad >= 0.9) with fallback to
+    deprecated Device.DEFAULT for older versions.
+
+    Returns the actual device string that was set (e.g. 'METAL', 'CUDA:0', 'CPU').
+    """
+    # Map parsed key to tinygrad device name
+    if device_key.startswith("cuda"):
+        cuda_idx = device_key.split(":")[-1] if ":" in device_key else "0"
+        target = f"CUDA:{cuda_idx}"
+    elif device_key == "mps":
+        target = "METAL"
+    else:
+        target = device_key.upper()
+
+    # Try new API first (tinygrad >= 0.9): DEV.value = target
+    try:
+        from tinygrad.helpers import DEV
+        DEV.value = target
+        return target
+    except ImportError:
+        pass
+
+    # Fallback to deprecated API for older tinygrad versions
+    try:
+        from tinygrad import Device
+        Device.DEFAULT = target
+        return target
+    except (ImportError, AttributeError):
+        return device_key.upper()
 
 def check_diffusers() -> Dict[str, Any]:
     """Check if diffusers and related packages are available for image generation."""

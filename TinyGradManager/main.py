@@ -480,18 +480,8 @@ class AppDelegate(NSObject):
         selected_device = self.llm_gpu_popup.titleOfSelectedItem() if self.llm_gpu_popup else "cpu"
         if selected_device:
             device_key = env_checker.parse_gpu_device_key(selected_device)
-            self.appendLog_(f"[GPU] Setting LLM device to: {device_key}")
-            try:
-                from tinygrad import Device
-                if device_key.startswith("cuda"):
-                    cuda_idx = device_key.split(":")[-1]
-                    Device.DEFAULT = f"CUDA:{cuda_idx}"
-                elif device_key == "mps":
-                    Device.DEFAULT = "METAL"
-                else:
-                    Device.DEFAULT = device_key.upper()
-            except Exception as e:
-                self.appendLog_(f"[WARN] Could not set tinygrad device: {e}")
+            actual_device = env_checker.set_tinygrad_device(device_key)
+            self.appendLog_(f"[GPU] Setting LLM device to: {actual_device}")
 
         self.appendLog_(f"[...] Loading model from {self.model_path}...")
         try:

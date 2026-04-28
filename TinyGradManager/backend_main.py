@@ -57,14 +57,7 @@ def _log(msg: str) -> None:
 
 def _load_llm_model(file_path: str, device_key: str = "cpu") -> dict:
     global loaded_model, model_path
-    try:
-        from tinygrad import Device
-        if device_key.startswith("cuda"):
-            Device.DEFAULT = f"CUDA:{device_key.split(':')[-1]}"
-        elif device_key == "mps":
-            Device.DEFAULT = "METAL"
-    except Exception:
-        pass
+    env_checker.set_tinygrad_device(device_key)
 
     from tinygrad.nn.state import safe_load, torch_load
 
