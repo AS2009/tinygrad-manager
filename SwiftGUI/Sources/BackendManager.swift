@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Darwin
 
 // MARK: - Python Backend Process Manager
 
@@ -24,7 +25,18 @@ final class BackendManager {
         }
 
         // 2. Check bundled Resources (for .app bundle)
+        // Prefer Resources/TinyGradManager/ where modules are co-located
         if let execURL = Bundle.main.executableURL {
+            let pkgURL = execURL
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Resources")
+                .appendingPathComponent("TinyGradManager")
+                .appendingPathComponent("backend_main.py")
+            if FileManager.default.fileExists(atPath: pkgURL.path) {
+                return pkgURL
+            }
+
             let resourcesURL = execURL
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
@@ -32,17 +44,6 @@ final class BackendManager {
                 .appendingPathComponent("backend_main.py")
             if FileManager.default.fileExists(atPath: resourcesURL.path) {
                 return resourcesURL
-            }
-
-            // Also check Resources/TinyGradManager/backend_main.py
-            let altURL = execURL
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent("Resources")
-                .appendingPathComponent("TinyGradManager")
-                .appendingPathComponent("backend_main.py")
-            if FileManager.default.fileExists(atPath: altURL.path) {
-                return altURL
             }
         }
 
@@ -82,7 +83,9 @@ final class BackendManager {
     }
 
     func start() {
-        guard case .stopped = processState else { return }
+        // Allow start from stopped, crashed, or restarting states
+        if case .running = processState { return }
+        if case .starting = processState { return }
 
         guard let scriptURL = findBackendScript() else {
             processState = .crashed("Cannot find backend_main.py")
@@ -100,14 +103,17 @@ final class BackendManager {
         proc.arguments = ["-u", scriptURL.path, "--port", "1234"]
         proc.currentDirectoryURL = scriptURL.deletingLastPathComponent()
 
-        // Set PYTHONPATH to include the backend script directory
+        // Set PYTHONPATH to include both the script directory and its parent.
+        // In bundle: scriptDir = Resources/TinyGradManager/, parent = Resources/ (site-packages)
+        // In dev:    scriptDir = TinyGradManager/,         parent = repo root
         var env = ProcessInfo.processInfo.environment
         let scriptDir = scriptURL.deletingLastPathComponent().path
+        let parentDir = scriptURL.deletingLastPathComponent().deletingLastPathComponent().path
+        var paths = [scriptDir, parentDir]
         if let existingPath = env["PYTHONPATH"] {
-            env["PYTHONPATH"] = "\(scriptDir):\(existingPath)"
-        } else {
-            env["PYTHONPATH"] = scriptDir
+            paths.append(existingPath)
         }
+        env["PYTHONPATH"] = paths.joined(separator: ":")
         proc.environment = env
 
         // Capture stdout
@@ -179,7 +185,7 @@ final class BackendManager {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self, let p = self.process, p.isRunning else { return }
             self.log("Backend did not exit gracefully, force killing...")
-            p.interrupt() // SIGKILL fallback
+            kill(p.processIdentifier, SIGKILL)
         }
 
         // Wait for process to actually exit

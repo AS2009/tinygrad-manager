@@ -82,8 +82,8 @@ struct ImageGenCard: View {
                             source: src,
                             device: parseDeviceKey(from: selectedDevice)
                         )
-                        statusText = msg.contains("True") || msg.contains("loaded")
-                            ? "Ready" : "Error: \(msg)"
+                        statusText = msg.hasPrefix("Error")
+                            ? msg : "Ready — \(msg)"
                         isLoading = false
                     }
                 }

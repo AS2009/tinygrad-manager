@@ -67,8 +67,8 @@ jobs:
             fi
           done
 
-          # Copy backend_main.py to a predictable location for BackendManager discovery
-          cp TinyGradManager/backend_main.py "$RESOURCES/"
+          # Copy backend_main.py alongside the TinyGradManager package
+          # (already included via cp -R above; BackendManager finds it at Resources/TinyGradManager/backend_main.py)
 
           # Create Info.plist (Swift binary is the entry point)
           cat > "$APP/Contents/Info.plist" << 'PLIST_EOF'

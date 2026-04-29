@@ -16,7 +16,14 @@ import signal
 import argparse
 from typing import Optional
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _script_dir)
+# In a bundled .app, our modules may be in TinyGradManager/ subdirectory
+# while site-packages are at the Resources/ level. Add both.
+if os.path.basename(_script_dir) != "TinyGradManager":
+    _pkg_dir = os.path.join(_script_dir, "TinyGradManager")
+    if os.path.isdir(_pkg_dir):
+        sys.path.insert(0, _pkg_dir)
 
 import gpu_manager
 import service_controller

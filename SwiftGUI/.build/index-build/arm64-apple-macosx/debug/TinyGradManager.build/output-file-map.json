@@ -1,0 +1,75 @@
+{
+  "": {
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/primary.swiftdeps"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendClient.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendClient.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendClient.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendClient.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendClient.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/BackendManager.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendManager.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendManager.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendManager.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/BackendManager.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/Components.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Components.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Components.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Components~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Components.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Components.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ConsoleCard.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ConsoleCard.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ConsoleCard.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ConsoleCard~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ConsoleCard.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ConsoleCard.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ContentView.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ContentView.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ContentView.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ContentView.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ImageGenCard.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ModelCard.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/Models.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Models.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Models.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Models~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Models.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/Models.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/SystemStatusCard.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/SystemStatusCard.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/SystemStatusCard.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/SystemStatusCard~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/SystemStatusCard.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/SystemStatusCard.dia"
+  },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/TinyGradManagerApp.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/TinyGradManagerApp.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/TinyGradManagerApp.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/TinyGradManagerApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/TinyGradManagerApp.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/index-build/arm64-apple-macosx/debug/TinyGradManager.build/TinyGradManagerApp.dia"
+  }
+}

@@ -55,8 +55,7 @@ final class BackendClient {
             let data = try await get("/api/status")
             if let s = try? JSONDecoder().decode(StatusInfo.self, from: data) {
                 status = s
-                failureCount = 0
-                connectionState = .connected
+                handleSuccess()
             }
         } catch {
             handleFailure()
@@ -68,8 +67,7 @@ final class BackendClient {
             let data = try await get("/api/gpu")
             if let g = try? JSONDecoder().decode(GPUInfo.self, from: data) {
                 gpuInfo = g
-                failureCount = 0
-                connectionState = .connected
+                handleSuccess()
             }
         } catch {
             handleFailure()
@@ -90,13 +88,20 @@ final class BackendClient {
         do {
             let data = try await get("/api/logs?since=\(logIndex)")
             if let r = try? JSONDecoder().decode(LogResponse.self, from: data) {
-                if !r.entries.isEmpty {
+                // Detect backend restart: total dropped below our index
+                if r.total < logIndex {
+                    logIndex = 0
+                    // Re-fetch from start on next poll; append only new entries this round
+                    if !r.entries.isEmpty {
+                        logs.append(contentsOf: r.entries)
+                        logIndex = r.total
+                    }
+                } else if !r.entries.isEmpty {
                     logs.append(contentsOf: r.entries)
                     logIndex = r.total
                     if logs.count > 1000 { logs.removeFirst(logs.count - 1000) }
                 }
-                failureCount = 0
-                connectionState = .connected
+                handleSuccess()
             }
         } catch {
             handleFailure()
@@ -109,11 +114,13 @@ final class BackendClient {
         let body: [String: String] = ["file_path": filePath, "device": device]
         do {
             let data = try await post("/api/model/load", body: body)
+            handleSuccess()
             if let r = try? JSONDecoder().decode(LoadResponse.self, from: data) {
                 return r.detail ?? r.model_name.map { "Loaded: \($0)" } ?? r.error ?? r.message ?? "Unknown response"
             }
             return "Invalid response"
         } catch {
+            handleFailure()
             return "Error: \(error.localizedDescription)"
         }
     }
@@ -122,11 +129,13 @@ final class BackendClient {
         let body: [String: String] = ["model_source": source, "device": device]
         do {
             let data = try await post("/api/image/load", body: body)
+            handleSuccess()
             if let r = try? JSONDecoder().decode(LoadResponse.self, from: data) {
                 return r.message ?? r.error ?? "Unknown response"
             }
             return "Invalid response"
         } catch {
+            handleFailure()
             return "Error: \(error.localizedDescription)"
         }
     }
@@ -139,6 +148,7 @@ final class BackendClient {
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: body)
             let data = try await postData("/api/image/generate", body: jsonData)
+            handleSuccess()
             return try? JSONDecoder().decode(ImageGenResponse.self, from: data)
         } catch {
             handleFailure()
@@ -149,6 +159,7 @@ final class BackendClient {
     func startService() async -> Bool {
         do {
             let data = try await post("/api/service/start", body: [:] as [String: String])
+            handleSuccess()
             if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Bool] {
                 if obj["success"] == true { serviceRunning = true }
                 return obj["success"] ?? false
@@ -163,6 +174,7 @@ final class BackendClient {
     func stopService() async -> Bool {
         do {
             let data = try await post("/api/service/stop", body: [:] as [String: String])
+            handleSuccess()
             if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Bool] {
                 if obj["success"] == true { serviceRunning = false }
                 return obj["success"] ?? false
@@ -183,10 +195,17 @@ final class BackendClient {
 
     func clearLogs() {
         logs.removeAll()
-        logIndex = 0
+        // Keep logIndex to avoid re-fetching old backend logs
     }
 
     // MARK: - Internal
+
+    private func handleSuccess() {
+        failureCount = 0
+        if connectionState != .connected {
+            connectionState = .connected
+        }
+    }
 
     private func handleFailure() {
         failureCount += 1

@@ -29,11 +29,9 @@ struct SystemStatusCard: View {
                     isTogglingService = true
                     Task {
                         if backend.serviceRunning {
-                            let ok = await backend.stopService()
-                            if !ok { backend.serviceRunning = true } // revert on failure
+                            _ = await backend.stopService()
                         } else {
-                            let ok = await backend.startService()
-                            if !ok { backend.serviceRunning = false }
+                            _ = await backend.startService()
                         }
                         isTogglingService = false
                     }
