@@ -22,7 +22,7 @@ class ImageGenerator:
     def set_log_callback(self, fn: Callable[[str], None]) -> None:
         self._log = fn
 
-    def load_model(self, model_id: str, device: str = "cpu") -> Tuple[bool, str]:
+    def load_model(self, model_id: str, device: str = "mps") -> Tuple[bool, str]:
         with self._lock:
             try:
                 torch = __import__('torch')
@@ -75,10 +75,11 @@ class ImageGenerator:
                         pass
                 elif device == "mps" and torch.backends.mps.is_available():
                     pipe = pipe.to("mps")
-                    self._log("[IMG] Pipeline moved to MPS (Apple Silicon)")
+                    self._log("[IMG] Pipeline moved to MPS (Apple Silicon GPU)")
+                elif device == "mps" and not torch.backends.mps.is_available():
+                    return False, "MPS (Apple Silicon GPU) not available. Install PyTorch with MPS support."
                 else:
-                    pipe = pipe.to("cpu")
-                    self._log("[IMG] Pipeline moved to CPU (this will be slow)")
+                    return False, f"No GPU available for device '{device}'. This app requires GPU."
 
                 self.pipeline = pipe
                 self.model_id = model_id
@@ -114,7 +115,7 @@ class ImageGenerator:
 
                 generator = None
                 if seed is not None:
-                    generator = torch.Generator(device=self.device if self.device else "cpu")
+                    generator = torch.Generator(device=self.device if self.device else "mps")
                     generator = generator.manual_seed(seed)
 
                 self._log(f"[IMG] Generating: '{prompt[:80]}{'...' if len(prompt) > 80 else ''}'")

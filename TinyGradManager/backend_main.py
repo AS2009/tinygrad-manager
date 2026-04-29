@@ -55,7 +55,7 @@ def _log(msg: str) -> None:
 
 # ── model loading ─────────────────────────────────────────────────────────────
 
-def _load_llm_model(file_path: str, device_key: str = "cpu") -> dict:
+def _load_llm_model(file_path: str, device_key: str = "mps") -> dict:
     global loaded_model, model_path
     env_checker.set_tinygrad_device(device_key)
 
@@ -116,11 +116,11 @@ def create_app():
 
     class LoadModelReq(BaseModel):
         file_path: str
-        device: str = "cpu"
+        device: str = "mps"
 
     class LoadImageModelReq(BaseModel):
         model_source: str
-        device: str = "cpu"
+        device: str = "mps"
 
     class GenImageReq(BaseModel):
         prompt: str

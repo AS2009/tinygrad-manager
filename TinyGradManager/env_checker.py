@@ -1,8 +1,14 @@
+import os
 import subprocess
 import sys
 import importlib.util
 import shutil
 from typing import Dict, Any, List, Optional, Tuple
+
+# Force Metal GPU usage on macOS — must be set before any tinygrad import
+if sys.platform == "darwin":
+    os.environ.setdefault("METAL", "1")
+    os.environ.setdefault("GPU", "1")
 
 def run_command(cmd: str, timeout: int = 5) -> Tuple[bool, str]:
     try:
@@ -154,7 +160,8 @@ def get_available_runtimes() -> List[str]:
 def get_available_gpu_devices() -> List[str]:
     """Return GPU device strings usable by both tinygrad and PyTorch/diffusers.
 
-    Priority: CUDA devices first, then MPS (Apple Silicon), then CPU.
+    Priority: CUDA devices first, then MPS (Apple Silicon).
+    Only GPU devices are returned — no CPU fallback.
     """
     devices = []
     has_mps = False
@@ -209,9 +216,6 @@ def get_available_gpu_devices() -> List[str]:
             devices.append("mps (Apple Silicon GPU)")
             has_mps = True
 
-    # Fallback: CPU always available
-    devices.append("cpu")
-
     # Deduplicate while preserving order
     seen = set()
     unique = []
@@ -235,13 +239,14 @@ def _is_apple_gpu_device(device_name_upper: str) -> bool:
     return False
 
 def parse_gpu_device_key(device_str: str) -> str:
-    """Extract the device key (e.g. 'cuda:0', 'mps', 'cpu') from a display string.
+    """Extract the device key (e.g. 'cuda:0', 'mps') from a display string.
 
     Handles display strings like "cuda:0 (NVIDIA ...)", "mps (Apple Silicon GPU)",
     and raw tinygrad device names like "METAL", "GPU", "ANE", "CUDA".
+    Only GPU devices are supported — defaults to "mps" if unrecognized.
     """
     if not device_str:
-        return "cpu"
+        return "mps"
     d = device_str.strip()
     d_upper = d.upper()
 
@@ -263,44 +268,62 @@ def parse_gpu_device_key(device_str: str) -> str:
         if d_upper.startswith(prefix):
             return "mps"
 
-    # CLANG, LLVM, CPU -> cpu
-    if d_upper in ("CLANG", "LLVM", "CPU") or d_upper.startswith(("CLANG:", "LLVM:", "CPU:")):
-        return "cpu"
-
-    return "cpu"
+    # Default to MPS (Apple Silicon GPU) — no CPU fallback
+    return "mps"
 
 def set_tinygrad_device(device_key: str) -> str:
     """Set tinygrad's device based on a parsed device key.
 
-    Uses the new DEV.value API (tinygrad >= 0.9) with fallback to
-    deprecated Device.DEFAULT for older versions.
+    Uses multiple strategies to force GPU usage:
+    1. Environment variables (METAL=1, GPU=1)
+    2. DEV.value API (tinygrad >= 0.9)
+    3. Device.DEFAULT assignment (older tinygrad)
 
-    Returns the actual device string that was set (e.g. 'METAL', 'CUDA:0', 'CPU').
+    Returns the actual device string that was set (e.g. 'METAL', 'CUDA:0').
     """
     # Map parsed key to tinygrad device name
     if device_key.startswith("cuda"):
         cuda_idx = device_key.split(":")[-1] if ":" in device_key else "0"
         target = f"CUDA:{cuda_idx}"
+        os.environ["GPU"] = "1"
     elif device_key == "mps":
         target = "METAL"
+        os.environ["METAL"] = "1"
+        os.environ["GPU"] = "1"
     else:
-        target = device_key.upper()
+        target = "METAL"  # Default to Metal GPU
+        os.environ["METAL"] = "1"
+        os.environ["GPU"] = "1"
 
-    # Try new API first (tinygrad >= 0.9): DEV.value = target
+    # Strategy 1: newer tinygrad DEV.value API
     try:
         from tinygrad.helpers import DEV
         DEV.value = target
-        return target
     except ImportError:
         pass
 
-    # Fallback to deprecated API for older tinygrad versions
+    # Strategy 2: deprecated Device.DEFAULT assignment
     try:
         from tinygrad import Device
         Device.DEFAULT = target
-        return target
     except (ImportError, AttributeError):
-        return device_key.upper()
+        pass
+
+    # Strategy 3: set Device._DEFAULT directly (bypass property)
+    try:
+        from tinygrad import Device
+        if hasattr(Device, '_DEFAULT'):
+            Device._DEFAULT = target
+    except (ImportError, AttributeError):
+        pass
+
+    # Verify what actually got set
+    try:
+        from tinygrad import Device
+        current = str(Device.DEFAULT)
+    except Exception:
+        current = target
+    return f"{target} (current: {current})"
 
 def check_diffusers() -> Dict[str, Any]:
     """Check if diffusers and related packages are available for image generation."""

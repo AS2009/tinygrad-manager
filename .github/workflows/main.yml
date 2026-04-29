@@ -46,7 +46,7 @@ jobs:
           rm -rf "$APP"
           mkdir -p "$MACOS" "$RESOURCES"
 
-          # Copy Swift binary
+          # Copy Swift binary (now manages its own Python backend)
           cp "$SWIFT_BIN" "$MACOS/TinyGradManager"
 
           # Copy Python backend
@@ -67,49 +67,10 @@ jobs:
             fi
           done
 
-          # Copy backend_main.py to a predictable location and create entry script
+          # Copy backend_main.py to a predictable location for BackendManager discovery
           cp TinyGradManager/backend_main.py "$RESOURCES/"
 
-          # Create launch script
-          cat > "$MACOS/launch.sh" << 'LAUNCH_EOF'
-          #!/bin/bash
-          # TinyGrad Manager launcher
-          # Starts the Python backend, then the Swift GUI
-
-          BUNDLE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-          RESOURCES="$BUNDLE_DIR/Resources"
-          SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-          # Add bundled Python packages to path
-          export PYTHONPATH="$RESOURCES:$PYTHONPATH"
-
-          # Start the Python backend
-          cd "$RESOURCES"
-          python3 backend_main.py --port 1234 &
-          BACKEND_PID=$!
-
-          # Wait for backend to be ready
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:1234/api/status > /dev/null 2>&1; then
-              break
-            fi
-            sleep 0.5
-          done
-
-          # Start the Swift GUI
-          "$SCRIPT_DIR/TinyGradManager" &
-          GUI_PID=$!
-
-          # Cleanup on exit
-          trap "kill $GUI_PID $BACKEND_PID 2>/dev/null; exit 0" EXIT INT TERM
-
-          # Wait for GUI to exit, then stop backend
-          wait $GUI_PID 2>/dev/null
-          kill $BACKEND_PID 2>/dev/null
-          LAUNCH_EOF
-          chmod +x "$MACOS/launch.sh"
-
-          # Create Info.plist
+          # Create Info.plist (Swift binary is the entry point)
           cat > "$APP/Contents/Info.plist" << 'PLIST_EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -126,7 +87,7 @@ jobs:
               <key>CFBundleShortVersionString</key>
               <string>2.0.0</string>
               <key>CFBundleExecutable</key>
-              <string>launch.sh</string>
+              <string>TinyGradManager</string>
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>LSMinimumSystemVersion</key>

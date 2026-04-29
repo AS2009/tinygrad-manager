@@ -1,6 +1,11 @@
 import os
 import sys
 
+# Force Metal GPU — must be set before any tinygrad/torch import
+if sys.platform == "darwin":
+    os.environ.setdefault("METAL", "1")
+    os.environ.setdefault("GPU", "1")
+
 # 修复动态库路径
 if getattr(sys, 'frozen', False) or '.app/Contents/MacOS' in sys.executable:
     base_dir = os.path.dirname(sys.executable)
@@ -477,7 +482,7 @@ class AppDelegate(NSObject):
             return
 
         # Set GPU device for LLM
-        selected_device = self.llm_gpu_popup.titleOfSelectedItem() if self.llm_gpu_popup else "cpu"
+        selected_device = self.llm_gpu_popup.titleOfSelectedItem() if self.llm_gpu_popup else None
         if selected_device:
             device_key = env_checker.parse_gpu_device_key(selected_device)
             actual_device = env_checker.set_tinygrad_device(device_key)
@@ -561,7 +566,7 @@ class AppDelegate(NSObject):
                 return
 
         selected_device = self.img_gpu_popup.titleOfSelectedItem() if self.img_gpu_popup else None
-        device_key = env_checker.parse_gpu_device_key(selected_device or "cpu")
+        device_key = env_checker.parse_gpu_device_key(selected_device or "")
         self.appendLog_(f"[IMG] Loading image model '{model_id}' on {device_key}...")
         self.img_status_label.setStringValue_("Status: Loading model...")
 
