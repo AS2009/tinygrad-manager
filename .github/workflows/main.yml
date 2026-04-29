@@ -126,16 +126,31 @@ jobs:
           DMG_NAME="TinyGradManager"
           DMG_FILE="dist/${DMG_NAME}.dmg"
 
+          # Detach any previously mounted volume with the same name
+          hdiutil detach "/Volumes/${DMG_NAME}" 2>/dev/null || true
+          # Also try to eject if the DMG file itself is attached
+          hdiutil detach "${DMG_FILE}" 2>/dev/null || true
+          # Remove stale DMG if it exists
+          rm -f "${DMG_FILE}"
+
           TMP_DIR=$(mktemp -d)
           cp -R "$APP" "$TMP_DIR/"
-          # Create Applications symlink for drag-to-install
           ln -s /Applications "$TMP_DIR/Applications"
 
           hdiutil create -volname "$DMG_NAME" \
             -srcfolder "$TMP_DIR" \
             -ov -format UDZO \
             -imagekey zlib-level=9 \
-            "$DMG_FILE"
+            "$DMG_FILE" || {
+              # Retry once after forced cleanup
+              hdiutil detach "/Volumes/${DMG_NAME}" 2>/dev/null || true
+              rm -f "${DMG_FILE}"
+              hdiutil create -volname "$DMG_NAME" \
+                -srcfolder "$TMP_DIR" \
+                -ov -format UDZO \
+                -imagekey zlib-level=9 \
+                "$DMG_FILE"
+            }
 
           rm -rf "$TMP_DIR"
           echo "DMG: $DMG_FILE ($(du -sh "$DMG_FILE" | cut -f1))"
