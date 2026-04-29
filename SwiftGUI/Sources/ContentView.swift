@@ -8,11 +8,27 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectBlur(material: .underWindowBackground, blendingMode: .behindWindow)
-                .ignoresSafeArea()
+            VisualEffectBlur(
+                material: LiquidGlassDesign.windowMaterial,
+                blendingMode: LiquidGlassDesign.windowBlending
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 HeaderView()
+                    .background {
+                        if macOSVersion.is26OrLater {
+                            // Subtle top-down luminance gradient — Liquid Glass depth cue
+                            VStack(spacing: 0) {
+                                LinearGradient(
+                                    colors: [.white.opacity(0.06), .clear],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                                .frame(height: 120)
+                                Spacer()
+                            }
+                        }
+                    }
 
                 ScrollView {
                     VStack(spacing: 12) {
@@ -44,19 +60,18 @@ struct HeaderView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text("TinyGrad Manager")
+                    Text(verbatim: "\(L10n.appName)")
                         .font(.system(size: 26, weight: .bold))
                     connectionDot
                 }
-                Text("Model Management & GPU Control")
+                Text(verbatim: "\(L10n.appSubtitle)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
             Spacer()
 
-            // Retry button when disconnected
             if case .disconnected = backend.connectionState {
-                PillButton("Retry") { [backendManager] in
+                PillButton("\(L10n.retry)") { [backendManager] in
                     backendManager.start()
                 }
             }
@@ -88,9 +103,9 @@ struct HeaderView: View {
 
     private var dotText: String {
         switch backend.connectionState {
-        case .disconnected: "Disconnected"
-        case .connecting:   "Starting..."
-        case .connected:    "Connected"
+        case .disconnected: "\(L10n.disconnected)"
+        case .connecting:   "\(L10n.starting)"
+        case .connected:    "\(L10n.connected)"
         case .error(let m): m
         }
     }

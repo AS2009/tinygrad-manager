@@ -48,6 +48,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/L10n.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ModelCard.swift"
         },
         {
@@ -81,6 +85,7 @@
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ConsoleCard.swift.o",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ContentView.swift.o",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.swift.o",
+        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n.swift.o",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.swift.o",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/Models.swift.o",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/SystemStatusCard.swift.o",
@@ -167,6 +172,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.swift.o"
         },
         {
@@ -194,6 +203,7 @@
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ConsoleCard.swift",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ContentView.swift",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ImageGenCard.swift",
+        "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/L10n.swift",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ModelCard.swift",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/Models.swift",
         "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/SystemStatusCard.swift",
@@ -220,6 +230,7 @@
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ConsoleCard.swift",
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ContentView.swift",
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ImageGenCard.swift",
+      "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/L10n.swift",
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ModelCard.swift",
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/Models.swift",
       "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/SystemStatusCard.swift",
@@ -345,6 +356,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/L10n.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ModelCard.swift"
         },
         {
@@ -392,6 +407,10 @@
         {
           "kind" : "file",
           "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n.swift.o"
         },
         {
           "kind" : "file",

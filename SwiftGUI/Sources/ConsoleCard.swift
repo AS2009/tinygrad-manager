@@ -9,9 +9,10 @@ struct ConsoleCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "terminal.fill").font(.system(size: 13))
-                Text("Console").font(.system(size: 13, weight: .semibold))
+                Text(verbatim: "\(L10n.console)")
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Button("Clear") { backend.clearLogs() }
+                Button { backend.clearLogs() } label: { Text(verbatim: "\(L10n.clear)") }
                     .buttonStyle(.plain)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -31,7 +32,10 @@ struct ConsoleCard: View {
                     .id("bottom")
                 }
                 .frame(height: 160)
-                .background(.black.opacity(0.15))
+                .background {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.black.opacity(macOSVersion.is26OrLater ? 0.12 : 0.15))
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .onChange(of: backend.logs.count) {
                     withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }

@@ -14,16 +14,20 @@ struct SystemStatusCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "cpu.fill").font(.system(size: 13))
-                Text("System Status").font(.system(size: 13, weight: .semibold))
+                Text(verbatim: "\(L10n.systemStatus)")
+                    .font(.system(size: 13, weight: .semibold))
             }
 
             Text("GPU: \(backend.gpuInfo.gpu_info)")
                 .font(.system(size: 12))
 
             HStack(spacing: 10) {
-                Text("GPU Service").font(.system(size: 12, weight: .medium))
+                Text(verbatim: "\(L10n.gpuService)")
+                    .font(.system(size: 12, weight: .medium))
                 PillButton(
-                    backend.serviceRunning ? "Stop GPU Service" : "Start GPU Service",
+                    backend.serviceRunning
+                        ? "\(L10n.stopGpuService)"
+                        : "\(L10n.startGpuService)",
                     isLoading: isTogglingService
                 ) {
                     isTogglingService = true
@@ -37,7 +41,7 @@ struct SystemStatusCard: View {
                     }
                 }
                 Spacer()
-                PillButton("Check Env", isLoading: isLoadingEnv) {
+                PillButton("\(L10n.checkEnv)", isLoading: isLoadingEnv) {
                     isLoadingEnv = true
                     Task {
                         if let env = await backend.fetchEnv() {

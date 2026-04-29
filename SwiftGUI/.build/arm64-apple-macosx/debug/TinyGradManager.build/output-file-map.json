@@ -44,6 +44,13 @@
     "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.swiftdeps",
     "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ImageGenCard.dia"
   },
+  "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/L10n.swift": {
+    "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n.d",
+    "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n.swift.o",
+    "swiftmodule": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n~partial.swiftmodule",
+    "swift-dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n.swiftdeps",
+    "diagnostics": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/L10n.dia"
+  },
   "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/Sources/ModelCard.swift": {
     "dependencies": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.d",
     "object": "/Users/wangzeping/Documents/github/tinygrad-manager-1/SwiftGUI/.build/arm64-apple-macosx/debug/TinyGradManager.build/ModelCard.swift.o",

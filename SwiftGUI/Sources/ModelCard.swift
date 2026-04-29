@@ -15,22 +15,22 @@ struct ModelCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "doc.fill").font(.system(size: 13))
-                Text("Model File").font(.system(size: 13, weight: .semibold))
+                Text(verbatim: "\(L10n.modelFile)")
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text(backend.status.llm_loaded
-                    ? "Loaded: \(backend.status.llm_model ?? "")"
-                    : "No model")
+                Text(verbatim: backend.status.llm_loaded
+                    ? "\(L10n.loadedModel(backend.status.llm_model ?? ""))"
+                    : "\(L10n.noModel)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
 
-            // File picker row
             HStack(spacing: 10) {
-                Button("Browse...") { browseModelFile() }
+                Button { browseModelFile() } label: { Text(verbatim: "\(L10n.browse)") }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 Text(modelFile.isEmpty
-                    ? "No file selected"
+                    ? "\(L10n.noFileSelected)"
                     : (URL(fileURLWithPath: modelFile).lastPathComponent))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -39,11 +39,11 @@ struct ModelCard: View {
                 Spacer()
             }
 
-            // GPU picker + Load button
             HStack(spacing: 10) {
-                Text("GPU:").font(.system(size: 10)).foregroundStyle(.secondary)
+                Text(verbatim: "\(L10n.gpu)")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
                 if backend.gpuInfo.available_devices.isEmpty {
-                    Text("Detecting devices...")
+                    Text(verbatim: "\(L10n.detectingDevices)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 } else {
@@ -68,9 +68,9 @@ struct ModelCard: View {
                     }
                 }
                 Spacer()
-                PillButton("Load Model", primary: true, isLoading: isLoading) {
+                PillButton("\(L10n.loadModel)", primary: true, isLoading: isLoading) {
                     guard !modelFile.isEmpty else {
-                        loadResult = "Error: no file selected"
+                        loadResult = "\(L10n.errorSelectFile)"
                         return
                     }
                     isLoading = true
@@ -84,7 +84,6 @@ struct ModelCard: View {
                 }
             }
 
-            // Result
             if !loadResult.isEmpty {
                 Text(loadResult)
                     .font(.system(size: 10))

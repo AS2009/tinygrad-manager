@@ -24,34 +24,33 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        // Setup backend manager log forwarding
         backendManager.setLogCallback { [weak self] line in
             Task { @MainActor [weak self] in
                 self?.backendClient.appendLog(line)
             }
         }
 
-        // Create menu bar
+        // Menu bar
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem.button {
             btn.image = NSImage(systemSymbolName: "cpu.fill", accessibilityDescription: "TG")
-            btn.toolTip = "TinyGrad Manager"
+            btn.toolTip = "\(L10n.appName)"
         }
         let menu = NSMenu()
         let showItem = menu.addItem(
-            withTitle: "Show/Hide TinyGrad Manager",
+            withTitle: "\(L10n.showHide)",
             action: #selector(toggleWindow), keyEquivalent: ""
         )
         showItem.target = self
         menu.addItem(.separator())
         let quitItem = menu.addItem(
-            withTitle: "Quit TinyGrad Manager",
+            withTitle: "\(L10n.quit)",
             action: #selector(quitApp), keyEquivalent: "q"
         )
         quitItem.target = self
         statusItem.menu = menu
 
-        // Create window
+        // Window
         let contentView = ContentView()
             .environment(backendClient)
             .environment(backendManager)
@@ -63,16 +62,25 @@ final class AppController: NSObject, NSApplicationDelegate, NSWindowDelegate {
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false
         )
-        window.title = "TinyGrad Manager"
+        window.title = "\(L10n.appName)"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
         window.contentView = hosting
         window.delegate = self
+
+        // macOS 26 Liquid Glass window enhancements
+        if LiquidGlassDesign.useLiquidGlassWindow {
+            window.backgroundColor = .clear
+            window.isOpaque = false
+            window.hasShadow = true
+            // Use the richest available appearance for deep translucency
+            window.appearance = NSAppearance(named: .vibrantDark)
+        }
+
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Start backend and polling
         backendManager.start()
         backendClient.startPolling()
     }

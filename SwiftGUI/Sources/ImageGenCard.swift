@@ -10,7 +10,7 @@ struct ImageGenCard: View {
     @State private var selectedDevice: String = ""
     @State private var prompt: String = "a cat sitting on a cloud, digital art"
     @State private var hfModelID: String = "runwayml/stable-diffusion-v1-5"
-    @State private var statusText: String = "Status: No model loaded"
+    @State private var statusText: String = "\(L10n.statusNoModel)"
     @State private var isGenerating = false
     @State private var isLoading = false
 
@@ -18,19 +18,20 @@ struct ImageGenCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "photo.fill").font(.system(size: 13))
-                Text("Text-to-Image").font(.system(size: 13, weight: .semibold))
+                Text(verbatim: "\(L10n.textToImage)")
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(statusText).font(.system(size: 11)).foregroundStyle(.secondary)
             }
 
-            // Local file picker row
             HStack(spacing: 8) {
-                Text("Model File:").font(.system(size: 10)).foregroundStyle(.secondary)
-                Button("Browse...") { browseImageModel() }
+                Text(verbatim: "\(L10n.imageModelFile)")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                Button { browseImageModel() } label: { Text(verbatim: "\(L10n.browse)") }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 Text(modelSource.isEmpty
-                    ? "No local file"
+                    ? "\(L10n.noLocalFile)"
                     : (URL(fileURLWithPath: modelSource).lastPathComponent))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -38,16 +39,16 @@ struct ImageGenCard: View {
                 Spacer()
             }
 
-            // HF ID + GPU + Load button
             HStack(spacing: 8) {
-                Text("Or HF ID:").font(.system(size: 10)).foregroundStyle(.secondary)
+                Text(verbatim: "\(L10n.orHFID)")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
                 TextField("runwayml/stable-diffusion-v1-5", text: $hfModelID)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11))
                     .frame(width: 200)
 
                 if backend.gpuInfo.available_devices.isEmpty {
-                    Text("Detecting...")
+                    Text(verbatim: "\(L10n.detectingDevices)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 } else {
@@ -73,38 +74,38 @@ struct ImageGenCard: View {
                 }
 
                 Spacer()
-                PillButton("Load Image Model", primary: true, isLoading: isLoading) {
+                PillButton("\(L10n.loadImageModel)", primary: true, isLoading: isLoading) {
                     let src = modelSource.isEmpty ? hfModelID : modelSource
                     isLoading = true
-                    statusText = "Loading..."
+                    statusText = "\(L10n.statusLoading)"
                     Task {
                         let msg = await backend.loadImageModel(
                             source: src,
                             device: parseDeviceKey(from: selectedDevice)
                         )
                         statusText = msg.hasPrefix("Error")
-                            ? msg : "Ready — \(msg)"
+                            ? msg : "\(L10n.statusReady) — \(msg)"
                         isLoading = false
                     }
                 }
             }
 
-            // Prompt + Generate button
             HStack(spacing: 8) {
-                Text("Prompt:").font(.system(size: 10)).foregroundStyle(.secondary)
+                Text(verbatim: "\(L10n.prompt)")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
                 TextField("Enter prompt...", text: $prompt)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11))
-                PillButton("Generate", primary: true, isLoading: isGenerating) {
+                PillButton("\(L10n.generateImage)", primary: true, isLoading: isGenerating) {
                     isGenerating = true
-                    statusText = "Generating..."
+                    statusText = "\(L10n.generating)"
                     Task {
                         if let r = await backend.generateImage(prompt: prompt) {
                             statusText = r.success
-                                ? "Done in \(r.elapsed_seconds ?? 0)s → \(r.filepath ?? "")"
-                                : "Failed"
+                                ? "\(L10n.statusDone(r.elapsed_seconds ?? 0, r.filepath ?? ""))"
+                                : "\(L10n.statusFailed)"
                         } else {
-                            statusText = "Generation failed"
+                            statusText = "\(L10n.statusFailed)"
                         }
                         isGenerating = false
                     }
